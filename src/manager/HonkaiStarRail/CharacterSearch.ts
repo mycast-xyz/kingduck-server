@@ -55,7 +55,6 @@ class HonkaiStarRailCharacterSearch {
       characterList = await HonkaiStarRailCharacterQuery.getCharacterList(
         gameData.id,
       );
-      11;
     }
 
     // 각 캐릭터에 속성과 경로 정보를 매핑

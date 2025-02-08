@@ -37,6 +37,39 @@ export class GirlsFrontline2CharacterQuery extends GameQuery {
       nest: true,
     });
   }
+  /**
+   * 캐릭터 목록 조회
+   * @param gameId - 게임 ID
+   * @param typeConditions - 캐릭터 타입 조건 배열
+   * @param rarityConditions - 캐릭터 레어도 조건
+   * @returns 캐릭터 목록과 카드 이미지 정보
+   */
+  async getCharacterListWithConditions(
+    gameId: number,
+    typeConditions: any,
+    rarityConditions: any,
+  ) {
+    console.log('getCharacterListWithConditions', typeConditions);
+
+    return await Character.findAll({
+      include: [
+        {
+          model: CharacterImage,
+          as: 'images',
+          where: { layout: 'card' },
+          attributes: ['url', 'layout'],
+        },
+      ],
+      attributes: ['isNew', 'isReleased', 'name', 'rarity', 'id', 'type'],
+      order: [
+        ['rarity', 'DESC'],
+        ['releaseDate', 'DESC'],
+      ],
+      where: { gameId, ...typeConditions, ...rarityConditions },
+      raw: true,
+      nest: true,
+    });
+  }
 
   /**
    * 캐릭터 상세 정보 조회

@@ -5,14 +5,57 @@ import GameQuery from '../AllGame/GameQuery';
  * 캐릭터 검색 관련 기능을 담당하는 클래스
  */
 class GirlsFrontline2CharacterSearch {
-  async searchCharacterList(gameData: any) {
+  async searchCharacterList(
+    gameData: any,
+    typeConditions: any[],
+    raityConditions: string,
+  ) {
+    let rarityOptions;
+    if (raityConditions) {
+      rarityOptions = { rarity: raityConditions };
+    }
+    // 받아온 데이터 처리
+    const setTypeOptions = (
+      types: Array<{ key: string; value: string }>,
+    ): Record<string, string> => {
+      const typeOptions: Record<string, string> = {};
+
+      types.forEach((type) => {
+        if (type.key === 'weaponType') {
+          typeOptions['type.weapon'] = type.value;
+        }
+        if (type.key === 'elementType') {
+          typeOptions['type.element'] = type.value;
+        }
+        if (type.key === 'corpType') {
+          typeOptions['type.corp'] = type.value;
+        }
+      });
+
+      return typeOptions;
+    };
+
+    const typeOptions = setTypeOptions(typeConditions);
+
+    console.log(typeOptions);
+
     // 게임의 타입(속성, 경로) 정보 조회
     const typeList = await GameQuery.getTypeList(gameData.id);
 
     // 캐릭터 기본 정보 목록 조회
-    const characterList = await GirlsFrontline2CharacterQuery.getCharacterList(
-      gameData.id,
-    );
+    let characterList;
+    if (typeOptions && Object.keys(typeOptions).length > 0) {
+      characterList =
+        await GirlsFrontline2CharacterQuery.getCharacterListWithConditions(
+          gameData.id,
+          typeOptions,
+          rarityOptions,
+        );
+    } else {
+      characterList = await GirlsFrontline2CharacterQuery.getCharacterList(
+        gameData.id,
+      );
+    }
 
     // 각 캐릭터에 속성과 경로 정보를 매핑
     const mappedCharacters = characterList.map((character: any) => ({
@@ -33,8 +76,6 @@ class GirlsFrontline2CharacterSearch {
         ),
       },
     }));
-
-    console.log(mappedCharacters);
 
     // 결과 반환
     return {

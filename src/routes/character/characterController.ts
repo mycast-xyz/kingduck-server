@@ -56,10 +56,17 @@ export class CharacterController {
         raity,
       );
     } else if (gameData.id == 2) {
-      result =
-        await GirlsFrontline2CharacterSearch.searchCharacterList(gameData);
+      result = await GirlsFrontline2CharacterSearch.searchCharacterList(
+        gameData,
+        typeConditions,
+        raity,
+      );
     } else if (gameData.id == 3) {
-      result = await NikkeCharacterSearch.searchCharacterList(gameData);
+      result = await NikkeCharacterSearch.searchCharacterList(
+        gameData,
+        typeConditions,
+        raity,
+      );
     }
 
     return res.status(200).json(result);
