@@ -44,7 +44,7 @@ class HonkaiStarRailCharacterSearch {
 
     // 캐릭터 기본 정보 목록 조회
     let characterList;
-    if (typeOptions && Object.keys(typeOptions).length > 0) {
+    if (typeOptions || rarityOptions) {
       characterList =
         await HonkaiStarRailCharacterQuery.getCharacterListWithConditions(
           gameData.id,

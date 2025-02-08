@@ -49,8 +49,6 @@ export class GirlsFrontline2CharacterQuery extends GameQuery {
     typeConditions: any,
     rarityConditions: any,
   ) {
-    console.log('getCharacterListWithConditions', typeConditions);
-
     return await Character.findAll({
       include: [
         {

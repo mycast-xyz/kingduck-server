@@ -14,9 +14,7 @@ export class CharacterController {
    */
   async getCharacterList(req: any, res: any): Promise<void> {
     const { slug } = req.params;
-    const { type, raity } = req.query;
-
-    console.log(type);
+    const { type, rarity } = req.query;
 
     // 타입 파라미터 파싱
     let typeConditions: any[] = [];
@@ -32,8 +30,6 @@ export class CharacterController {
         }
       });
     }
-
-    console.log('타입 조건:', typeConditions);
 
     // 1. 게임 정보 조회
     const gameData = await GameQuery.getGameInfo(slug);
@@ -53,19 +49,19 @@ export class CharacterController {
       result = await HonkaiStarRailCharacterSearch.searchCharacterList(
         gameData,
         typeConditions,
-        raity,
+        rarity,
       );
     } else if (gameData.id == 2) {
       result = await GirlsFrontline2CharacterSearch.searchCharacterList(
         gameData,
         typeConditions,
-        raity,
+        rarity,
       );
     } else if (gameData.id == 3) {
       result = await NikkeCharacterSearch.searchCharacterList(
         gameData,
         typeConditions,
-        raity,
+        rarity,
       );
     }
 

@@ -25,7 +25,6 @@ export class GameController {
         },
       ],
     });
-
     if (gameList) {
       res.status(200).json({
         resultCode: 200,

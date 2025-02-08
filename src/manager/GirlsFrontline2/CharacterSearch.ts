@@ -37,14 +37,12 @@ class GirlsFrontline2CharacterSearch {
 
     const typeOptions = setTypeOptions(typeConditions);
 
-    console.log(typeOptions);
-
     // 게임의 타입(속성, 경로) 정보 조회
     const typeList = await GameQuery.getTypeList(gameData.id);
 
     // 캐릭터 기본 정보 목록 조회
     let characterList;
-    if (typeOptions && Object.keys(typeOptions).length > 0) {
+    if (typeOptions || rarityOptions) {
       characterList =
         await GirlsFrontline2CharacterQuery.getCharacterListWithConditions(
           gameData.id,

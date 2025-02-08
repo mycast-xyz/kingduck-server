@@ -11,6 +11,7 @@ class NikkeCharacterSearch {
     raityConditions: string,
   ) {
     let rarityOptions;
+
     if (raityConditions) {
       rarityOptions = { rarity: raityConditions };
     }
@@ -48,7 +49,7 @@ class NikkeCharacterSearch {
 
     // 캐릭터 기본 정보 목록 조회
     let characterList;
-    if (typeOptions && Object.keys(typeOptions).length > 0) {
+    if (typeOptions || rarityOptions) {
       characterList = await NikkeCharacterQuery.getCharacterListWithConditions(
         gameData.id,
         typeOptions,
