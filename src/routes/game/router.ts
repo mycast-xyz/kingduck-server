@@ -9,6 +9,7 @@ const router = express.Router();
 
 // 요청 method 별로 라우팅
 router.get('/list/', GameController.getGameList);
+router.get('/admin/list', GameController.getAdminGameList);
 router.get('/:slug', GameController.getGame);
 
 export default router;

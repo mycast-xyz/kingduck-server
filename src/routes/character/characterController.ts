@@ -4,8 +4,16 @@ import HonkaiStarRailCharacterSearch from '../../manager/HonkaiStarRail/Characte
 import GirlsFrontline2CharacterSearch from '../../manager/GirlsFrontline2/CharacterSearch';
 import NikkeCharacterSearch from '../../manager/Nikke/CharacterSearch';
 
+// 어드민용
+import Character from '../../models/character/CharacterDef.Vo';
+import CharacterImage from '../../models/character/CharacterImage.Vo';
+import { CharacterInfo } from '../../models/character/CharacterInfo.Vo';
+import Skill from '../../models/skill/SkillDef.Vo';
+import Game from '../../models/game/GameDef.Vo';
+
 export class CharacterController {
   /**
+
    * 캐릭터 목록 조회 API
    * 1. 게임 정보 조회
    * 2. 타입(속성, 경로) 정보 조회
@@ -107,6 +115,112 @@ export class CharacterController {
     }
     console.log(result);
     return res.status(200).json(result);
+  }
+
+  /**
+   * 캐릭터 어드민 정보 조회 API
+   * 1. 게임 정보 조회
+   * 2. 캐릭터 기본 정보 조회
+   * 3. 추가 정보 병렬 조회 (속성, 경로, 스킬, 이미지)
+   * 4. 장착 아이템 정보 조회
+   * 5. 응답 데이터 구성
+   */
+  async getCharacterAdmin(req: any, res: any): Promise<void> {
+    const { slug, id } = req.params;
+
+    // 1. 게임 정보 조회
+    //const gameData = await GameQuery.getGameInfo();
+
+    // 1-1. 게임 정보 없으면 오류 반환
+    const CharacterData = await Character.findAll({
+      include: [
+        {
+          model: CharacterImage,
+
+          as: 'images',
+          where: { layout: 'card' },
+          attributes: ['url', 'layout'],
+        },
+      ],
+      attributes: [
+        'isNew',
+        'isReleased',
+        'name',
+        'rarity',
+        'id',
+        'type',
+        'gameId',
+        'releaseDate',
+      ],
+      order: [['id', 'ASC']],
+      raw: true,
+      nest: true,
+    });
+
+    // 각 캐릭터별 이미지 타입 카운트 및 스킬/상세 정보 추가
+    const characterListWithCounts = await Promise.all(
+      CharacterData.map(async (character: any) => {
+        // 게임 정보 조회
+        const gameInfo = await Game.findOne({
+          where: { id: character.gameId },
+          attributes: ['title', 'id'],
+          raw: true,
+        });
+
+        // 이미지 타입별 카운트
+        const cardCount = await CharacterImage.count({
+          where: {
+            characterId: character.id,
+            layout: 'card',
+          },
+        });
+
+        const artCount = await CharacterImage.count({
+          where: {
+            characterId: character.id,
+            layout: 'art',
+          },
+        });
+
+        const videoCount = await CharacterImage.count({
+          where: {
+            characterId: character.id,
+            layout: 'video',
+          },
+        });
+
+        // 스킬 카운트
+        const skillCount = await Skill.count({
+          where: { characterId: character.id },
+        });
+
+        // 상세 정보
+        const details = await CharacterInfo.findOne({
+          where: { characterId: character.id },
+          attributes: ['stats', 'itemData', 'ranks'],
+        });
+
+        return {
+          ...character,
+          game: gameInfo,
+          imageCount: {
+            card: cardCount,
+            art: artCount,
+            video: videoCount,
+          },
+          skillCount,
+          details: details || null,
+        };
+      }),
+    );
+
+    let result = characterListWithCounts;
+
+    return res.status(200).json({
+      resultCode: 200,
+      items: result,
+      resultMsg: 'SUCCESS',
+    });
   }
 }
 

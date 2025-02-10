@@ -20,6 +20,9 @@ router.get(
 );
 router.get('/Nikke/setData', characterCreateController.NikkeCharacterSet);
 
+// 어드민용
+router.get('/admin', CharacterController.getCharacterAdmin);
+
 // 요청 method 별로 라우팅
 router.get('/:slug', CharacterController.getCharacterList); // 전체 리스트 조회
 router.get('/:slug/:id', CharacterController.getCharacter); // 특정 캐릭터 조회
