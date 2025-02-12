@@ -21,7 +21,8 @@ router.get(
 router.get('/Nikke/setData', characterCreateController.NikkeCharacterSet);
 
 // 어드민용
-router.get('/admin', CharacterController.getCharacterAdmin);
+router.get('/admin', CharacterController.getCharacterListAdmin);
+router.get('/admin/:id', CharacterController.getCharacterAdmin);
 
 // 요청 method 별로 라우팅
 router.get('/:slug', CharacterController.getCharacterList); // 전체 리스트 조회
