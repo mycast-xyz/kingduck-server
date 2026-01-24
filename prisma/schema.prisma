@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Game {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique // 예: "genshin", "starrail", "wutheringwaves", "nikke", "reverse1999"
+  name        String
+  description String?
+  iconUrl     String?  @map("icon_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  elements   Element[]
+  characters Character[]
+  items      Item[]
+
+  @@map("games")
+}
+
+model Element {
+  id        Int      @id @default(autoincrement())
+  gameId    Int      @map("game_id")
+  name      String   // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt"
+  type      String   // "DamageType" 또는 "Path"
+  iconUrl   String?  @map("icon_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  game              Game        @relation(fields: [gameId], references: [id])
+  charactersElement Character[] @relation("CharacterElement")
+  charactersPath    Character[] @relation("CharacterPath")
+
+  @@map("elements")
+  @@index([gameId])
+  @@index([gameId, type])
+}
+
+model Character {
+  id         Int     @id @default(autoincrement())
+  gameId     Int     @map("game_id")
+  elementId  Int?    @map("element_id")
+  pathId     Int?    @map("path_id")
+  name       String
+  rarity     Int?    // 예: 4, 5
+  weaponType String? // 예: "Sword", "AR", "Rectifier" (Generic weapon type)
+  role       String? // 예: "DPS", "Support", "Defender"
+
+  description String? @db.Text
+  imageUrl    String? @map("image_url")
+
+  // 게임별 데이터 (예: 별자리, 버스트 타입, 등급 등)
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  game    Game     @relation(fields: [gameId], references: [id])
+  element Element? @relation("CharacterElement", fields: [elementId], references: [id])
+  path    Element? @relation("CharacterPath", fields: [pathId], references: [id])
+
+  @@map("characters")
+  @@index([gameId])
+  @@index([elementId])
+  @@index([pathId])
+}
+
+model Item {
+  id     Int    @id @default(autoincrement())
+  gameId Int    @map("game_id")
+  name   String
+  type   String // 예: "Weapon", "Artifact", "Lightcone", "Echo", "Material"
+  rarity Int?
+
+  description String? @db.Text
+  imageUrl    String? @map("image_url")
+
+  // 게임별 스탯 및 속성 (예: 공격력, 부옵션, 재료 유형 등)
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  game Game @relation(fields: [gameId], references: [id])
+
+  @@map("items")
+  @@index([gameId])
+}

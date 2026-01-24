@@ -3,9 +3,9 @@
   "LOG_LEVER": "debug",
   "port": 3000,
   "db_server": {
-    "user": "user",
+    "user": "postgres",
     "password": "102468",
-    "database": "test",
+    "database": "game",
     "host": "127.0.0.1",
     "port": "5432",
     "dialect": "postgres",

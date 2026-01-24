@@ -5,7 +5,7 @@ import cors from 'cors';
 // DB ORM 참조
 import { config } from './config/config';
 import routers from './routes/';
-import sequelize from './models';
+import { prisma } from './utils/prisma';
 import path from 'path';
 import logger from './utils/logger';
 
@@ -34,8 +34,8 @@ const server = app.listen(port, async () => {
   try {
     logger.info(`✅ Example app listening on port ${port}`);
 
-    await sequelize.authenticate();
-    logger.info(`✅ Database connected to discover`);
+    await prisma.$connect();
+    logger.info(`✅ Database connected (Prisma)`);
   } catch (error) {
     logger.error('❌ 서버 시작 실패:', error);
   }

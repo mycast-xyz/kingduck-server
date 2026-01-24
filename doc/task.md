@@ -1,0 +1,35 @@
+# 작업 목록
+
+- [x] 게임 정보 사이트를 위한 Prisma 스키마 설계 <!-- id: 0 -->
+  - [x] `Game` (게임) 테이블 (범용 지원) <!-- id: 1 -->
+  - [x] `Element` (속성) 테이블 (속성 정보) <!-- id: 2 -->
+  - [x] `Character` (캐릭터) 테이블 <!-- id: 3 -->
+  - [x] `Item` (아이템) 테이블 <!-- id: 4 -->
+  - [x] 관계 및 범용 필드 정의 <!-- id: 5 -->
+- [x] `schema.prisma`에 Prisma 스키마 구현 <!-- id: 6 -->
+- [x] Prisma 마이그레이션 실행 <!-- id: 7 -->
+- [x] 범용 게임(원신 등)을 위한 초기 시드 데이터(Seed Data) 생성 <!-- id: 8 -->
+- [x] 테스트용 임시 파일 삭제 (test_db.js, error logs) <!-- id: 9 -->
+- [x] Implement Game API <!-- id: 10 -->
+  - [x] Create `src/routes/game` structure <!-- id: 11 -->
+  - [x] Implement `GET /api/v0/game/list` (Fetch all games) <!-- id: 12 -->
+  - [x] Implement `GET /api/v0/game/:slug` (Fetch game details with elements) <!-- id: 13 -->
+- [x] Implement Character API <!-- id: 14 -->
+  - [x] Create `src/routes/character` structure <!-- id: 15 -->
+  - [x] Implement `GET /api/v0/character/list` <!-- id: 16 -->
+- [x] Implement Item API <!-- id: 17 -->
+  - [x] Create `src/routes/item` structure <!-- id: 18 -->
+- [ ] Implement Crawler Mockup <!-- id: 19 -->
+  - [x] Create directory structure <!-- id: 20 -->
+  - [x] Implement Core Modules (Browser, ScraperBase) <!-- id: 21 -->
+  - [x] Implement DataSyncService Mock <!-- id: 22 -->
+  - [x] Implement Genshin Scraper Mock <!-- id: 23 -->
+  - [x] Implement Scheduler <!-- id: 24 -->
+- [/] Implement Star Rail Crawler <!-- id: 25 -->
+  - [x] Create directory structure <!-- id: 26 -->
+  - [x] Implement ImageDownloader (WebP) <!-- id: 27 -->
+  - [x] Implement CharacterScraper <!-- id: 28 -->
+  - [x] Implement LightConeScraper <!-- id: 29 -->
+  - [x] Implement RelicScraper <!-- id: 30 -->
+  - [x] Implement ItemScraper <!-- id: 31 -->
+  - [x] Wire up Scheduler <!-- id: 32 -->

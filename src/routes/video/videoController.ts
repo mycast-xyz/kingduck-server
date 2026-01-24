@@ -3,9 +3,6 @@ import * as ApiUtils from '../../utils/apiUtils';
 import YoutubeUtils, { fetchAndDownloadVideo } from '../../utils/youtubeUtils';
 import path from 'path';
 
-import { Character } from '../../models/character/CharacterDef.Vo';
-import { CharacterImage } from '../../models/character/CharacterImage.Vo';
-
 export class VideoController {
   // 유튜브 크롤링 후 영상 다운로드 처리 구현
   // 파이썬 3.7 이상 설치 필요

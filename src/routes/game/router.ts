@@ -1,15 +1,9 @@
-import express from 'express';
+import { Router } from 'express';
+import * as controller from './controller';
 
-// 컨트롤러 참조
-import GameController from './gameController';
+const router = Router();
 
-const router = express.Router();
-
-//router.use(cors(corsOpt));
-
-// 요청 method 별로 라우팅
-router.get('/list/', GameController.getGameList);
-router.get('/admin/list', GameController.getAdminGameList);
-router.get('/:slug', GameController.getGame);
+router.get('/list', controller.getList);
+router.get('/:slug', controller.getDetail);
 
 export default router;
