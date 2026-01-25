@@ -28,6 +28,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // 이미지 영상 처리
 app.use('/assets', express.static(path.join(__dirname, '../static')));
 
+import { setupSwagger } from './utils/swagger';
+setupSwagger(app);
+
 app.use('/', routers);
 
 const server = app.listen(port, async () => {

@@ -17,7 +17,7 @@ export class DataSyncService {
     const existing = await prisma.element.findFirst({
       where: {
         gameId,
-        name,
+        name: { equals: name, mode: 'insensitive' },
         type,
       },
     });
@@ -79,10 +79,18 @@ export class DataSyncService {
         const existing = await prisma.character.findFirst({
           where: {
             gameId: game.id,
-            metadata: {
-              path: ['originalId'],
-              equals: originalId,
-            },
+            OR: [
+              {
+                metadata: {
+                  path: ['originalId'],
+                  equals: originalId,
+                },
+              },
+              // Fallback: Check by name if originalId check fails (sometimes string vs int issues in Prisma JSON)
+              {
+                name: item.name,
+              },
+            ],
           },
         });
 
@@ -131,6 +139,223 @@ export class DataSyncService {
 
     logger.info(
       `Sync complete for ${gameSlug}. Success: ${successCount}, Errors: ${errorCount}`,
+    );
+  }
+
+  /**
+   * Sync items (Lightcones, Relics, Materials etc)
+   */
+  public async syncItems(gameSlug: string, data: ScrapedData[]) {
+    logger.info(`Syncing ${data.length} items for ${gameSlug}...`);
+
+    const game = await prisma.game.findUnique({ where: { slug: gameSlug } });
+    if (!game) {
+      logger.error(`Game ${gameSlug} not found!`);
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const dataItem of data) {
+      try {
+        const originalId = dataItem.metadata?.originalId;
+        if (!originalId) {
+          logger.warn(`Item ${dataItem.name} has no originalId, skipping...`);
+          continue;
+        }
+
+        // Check if item already exists by originalId in metadata
+        const existing = await prisma.item.findFirst({
+          where: {
+            gameId: game.id,
+            metadata: {
+              path: ['originalId'],
+              equals: originalId,
+            },
+          },
+        });
+
+        const itemType = dataItem.metadata?.type || 'Unknown';
+
+        if (existing) {
+          await prisma.item.update({
+            where: { id: existing.id },
+            data: {
+              name: dataItem.name,
+              type: itemType,
+              rarity: dataItem.rarity || dataItem.metadata?.rarity,
+              description:
+                dataItem.description || dataItem.metadata?.description,
+              imageUrl: dataItem.imageUrl,
+              metadata: dataItem.metadata,
+              updatedAt: new Date(),
+            },
+          });
+          logger.info(
+            `Updated item: [${itemType}] ${dataItem.name} (ID: ${originalId})`,
+          );
+        } else {
+          await prisma.item.create({
+            data: {
+              gameId: game.id,
+              name: dataItem.name,
+              type: itemType,
+              rarity: dataItem.rarity || dataItem.metadata?.rarity,
+              description:
+                dataItem.description || dataItem.metadata?.description,
+              imageUrl: dataItem.imageUrl,
+              metadata: dataItem.metadata,
+            },
+          });
+          logger.info(
+            `Created item: [${itemType}] ${dataItem.name} (ID: ${originalId})`,
+          );
+        }
+        successCount++;
+      } catch (err) {
+        logger.error(`Failed to sync item ${dataItem.name}:`, err);
+        errorCount++;
+      }
+    }
+
+    logger.info(
+      `Sync complete for ${gameSlug} items. Success: ${successCount}, Errors: ${errorCount}`,
+    );
+  }
+
+  /**
+   * Sync YouTube Shorts videos
+   */
+  public async syncVideos(gameSlug: string, data: ScrapedData[]) {
+    logger.info(`Syncing ${data.length} videos for ${gameSlug}...`);
+
+    const game = await prisma.game.findUnique({ where: { slug: gameSlug } });
+    if (!game) {
+      logger.error(`Game ${gameSlug} not found!`);
+      return;
+    }
+
+    const YoutubeUtils = (await import('../../utils/youtubeUtils')).default;
+    const path = await import('path');
+    const fs = await import('fs');
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of data) {
+      try {
+        const { title, url, thumbnailUrl, characterName, type } = item;
+        logger.info(
+          `Processing video: ${title} (Matched Character: ${characterName})`,
+        );
+
+        // Check if video already exists
+        const existingVideo = await prisma.video.findUnique({
+          where: { url },
+        });
+
+        // Check if video already exists with any valid extension
+        const hasLocalFile =
+          existingVideo &&
+          existingVideo.localPath &&
+          (existingVideo.localPath.endsWith('.webm') ||
+            existingVideo.localPath.endsWith('.mp4'));
+
+        if (existingVideo && hasLocalFile) {
+          logger.debug(
+            `Skipping video (already exists and downloaded): ${title}`,
+          );
+          continue;
+        }
+
+        // Find character
+        let character = null;
+        if (characterName) {
+          character = await prisma.character.findFirst({
+            where: {
+              gameId: game.id,
+              name: {
+                contains: characterName,
+                mode: 'insensitive',
+              },
+            },
+          });
+        }
+
+        // Upsert video
+        const video = await prisma.video.upsert({
+          where: { url },
+          create: {
+            gameId: game.id,
+            characterId: character?.id,
+            title,
+            url,
+            thumbnailUrl,
+            type: type || 'KeyVisual',
+          },
+          update: {
+            title,
+            thumbnailUrl,
+            characterId: character?.id,
+            type: type || 'KeyVisual',
+          },
+        });
+        logger.info(
+          `Upserted video: ID ${video.id}, Title: "${video.title}" (URL: ${url})`,
+        );
+
+        // Download video if no valid local file exists
+        const currentFileExists =
+          video.localPath &&
+          (video.localPath.endsWith('.webm') ||
+            video.localPath.endsWith('.mp4'));
+
+        if (!currentFileExists) {
+          const videoId = url.split('/').pop() || '';
+          if (videoId) {
+            try {
+              const extension = await YoutubeUtils.downloadVideoById(videoId);
+              if (extension) {
+                const videoDir = path.join(__dirname, '../../../static/video/');
+                const files = fs.readdirSync(videoDir);
+                const downloadedFile = files.find(
+                  (f: string) =>
+                    f.startsWith(videoId) && f.endsWith(`.${extension}`),
+                );
+
+                if (downloadedFile) {
+                  const localPath = `assets/video/${downloadedFile}`;
+                  await prisma.video.update({
+                    where: { id: video.id },
+                    data: { localPath },
+                  });
+                  logger.info(
+                    `Downloaded video (${extension}): ${downloadedFile}`,
+                  );
+                }
+              } else {
+                logger.warn(`Failed to download video: ${videoId}`);
+              }
+            } catch (downloadErr) {
+              logger.error(
+                `Error during download for video ${videoId}:`,
+                downloadErr,
+              );
+              // Continue to next video even if download fails
+            }
+          }
+        }
+
+        successCount++;
+      } catch (err) {
+        logger.error(`Failed to sync video record for ${item.title}:`, err);
+        errorCount++;
+      }
+    }
+
+    logger.info(
+      `Sync complete. Success: ${successCount}, Errors: ${errorCount}`,
     );
   }
 }

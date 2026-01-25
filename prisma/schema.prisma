@@ -18,6 +18,7 @@ model Game {
   elements   Element[]
   characters Character[]
   items      Item[]
+  videos     Video[]
 
   @@map("games")
 }
@@ -62,6 +63,7 @@ model Character {
   game    Game     @relation(fields: [gameId], references: [id])
   element Element? @relation("CharacterElement", fields: [elementId], references: [id])
   path    Element? @relation("CharacterPath", fields: [pathId], references: [id])
+  videos  Video[]
 
   @@map("characters")
   @@index([gameId])
@@ -89,4 +91,24 @@ model Item {
 
   @@map("items")
   @@index([gameId])
+}
+
+model Video {
+  id           Int      @id @default(autoincrement())
+  gameId       Int      @map("game_id")
+  characterId  Int?     @map("character_id")
+  title        String
+  url          String   @unique
+  thumbnailUrl String?  @map("thumbnail_url")
+  localPath    String?  @map("local_path") // e.g., "assets/video/starrail/9Z9twPFh9iU.webm"
+  type         String   // e.g., "KeyVisual", "Trailer", "Shorts"
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  game      Game       @relation(fields: [gameId], references: [id])
+  character Character? @relation(fields: [characterId], references: [id])
+
+  @@map("videos")
+  @@index([gameId])
+  @@index([characterId])
 }

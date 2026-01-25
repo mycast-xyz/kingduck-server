@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer';
-import youtubedl from 'youtube-dl-exec';
 import path from 'path';
+import fs from 'fs';
 
 /**
  * YouTube 동영상 검색, 다운로드 및 처리를 위한 유틸리티 클래스
@@ -36,11 +36,21 @@ class YoutubeUtils {
       );
 
       await page.goto(url, { timeout: 100000 });
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // 페이지 로딩 대기
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // Initial load
+
+      // Scroll down multiple times to load all content (infinite scroll)
+      console.log('Scrolling to load all Shorts...');
+      for (let i = 0; i < 10; i++) {
+        await page.evaluate(() => {
+          window.scrollTo(0, document.documentElement.scrollHeight);
+        });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      console.log('Finished scrolling');
 
       // YouTube의 초기 데이터 추출
       const pageConfig = await page.evaluate(() => {
-        return ytInitialData || null;
+        return (window as any).ytInitialData || null;
       });
 
       if (!pageConfig) {
@@ -56,32 +66,53 @@ class YoutubeUtils {
     }
   }
 
-  /**
-   * YouTube 동영상을 다운로드하는 함수
-   * @param url YouTube 동영상 URL
-   * @param fileName 저장할 파일명 (확장자 제외)
-   * @returns 다운로드 성공 여부
-   */
   static async downloadYoutubeVideo(
     url: string,
     fileName: string,
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     try {
+      const youtubedl = (await import('youtube-dl-exec')).default;
       const saveDirectory = path.join(__dirname, '../../static/video/');
 
-      console.log(saveDirectory);
+      if (!fs.existsSync(saveDirectory)) {
+        fs.mkdirSync(saveDirectory, { recursive: true });
+      }
 
-      // youtube-dl을 사용하여 동영상 다운로드
+      console.log('Downloading to:', saveDirectory);
+
+      // Preferred format: Best WebM up to 1080p, then Best MP4 up to 1080p
+      // We use a simpler format selection that prioritizes 1080p/720p
+      // bestvideo[height<=1080][ext=webm]/bestvideo[height<=1080][ext=mp4]/best
+
+      const outputPathTemplate = path.join(
+        saveDirectory,
+        `${fileName}.%(ext)s`,
+      );
+
       await youtubedl(url, {
-        ffmpegLocation: 'C:\\ffmpeg\\bin\\ffmpeg.exe',
-        output: `${saveDirectory}${fileName}.webm`,
-        remuxVideo: 'webm',
-        mergeOutputFormat: 'webm',
+        output: outputPathTemplate,
+        format:
+          'bestvideo[height<=1080][ext=webm]/bestvideo[height<=1080][ext=mp4]/best',
+        noWarnings: true,
       });
-      return true;
-    } catch (error) {
-      console.error('동영상 다운로드 실패:', error);
-      return false;
+
+      // Find which file was actually created (extension might be webm or mp4)
+      const files = fs.readdirSync(saveDirectory);
+      const downloadedFile = files.find(
+        (f) =>
+          f.startsWith(fileName) && (f.endsWith('.webm') || f.endsWith('.mp4')),
+      );
+
+      if (downloadedFile) {
+        const extension = downloadedFile.split('.').pop() || 'webm';
+        console.log(`Successfully downloaded: ${downloadedFile}`);
+        return extension;
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error('동영상 다운로드 실패:', error.message);
+      return null;
     }
   }
 
@@ -90,7 +121,7 @@ class YoutubeUtils {
    * @param videoId YouTube 동영상 ID
    * @returns 다운로드 성공 여부
    */
-  static async downloadVideoById(videoId: string): Promise<boolean> {
+  static async downloadVideoById(videoId: string): Promise<string | null> {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     console.log(`다운로드 시작: ${url}`);
     return await this.downloadYoutubeVideo(url, videoId);
