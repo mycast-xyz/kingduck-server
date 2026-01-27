@@ -71,7 +71,16 @@ class YoutubeUtils {
     fileName: string,
   ): Promise<string | null> {
     try {
-      const youtubedl = (await import('youtube-dl-exec')).default;
+      // Create a wrapper that points to the system binary if possible
+      const youtubedlFactory = (await import('youtube-dl-exec')).create;
+
+      // Try to find system binary path (common locations)
+      // On Mac/Linux brew installs to /opt/homebrew/bin or /usr/local/bin
+      // We can try to use just 'yt-dlp' if it's in PATH, but spawn might not catch it if PATH isn't inherited perfectly in dev env.
+      // Let's assume 'yt-dlp' is in PATH.
+
+      const youtubedl = youtubedlFactory('yt-dlp');
+
       const saveDirectory = path.join(__dirname, '../../static/video/');
 
       if (!fs.existsSync(saveDirectory)) {
@@ -79,10 +88,6 @@ class YoutubeUtils {
       }
 
       console.log('Downloading to:', saveDirectory);
-
-      // Preferred format: Best WebM up to 1080p, then Best MP4 up to 1080p
-      // We use a simpler format selection that prioritizes 1080p/720p
-      // bestvideo[height<=1080][ext=webm]/bestvideo[height<=1080][ext=mp4]/best
 
       const outputPathTemplate = path.join(
         saveDirectory,
@@ -110,8 +115,12 @@ class YoutubeUtils {
       }
 
       return null;
+      return null;
     } catch (error: any) {
-      console.error('동영상 다운로드 실패:', error.message);
+      console.error('동영상 다운로드 실패 상세:', error);
+      console.error('동영상 다운로드 실패 메시지:', error.message);
+      if (error.stderr) console.error('STDERR:', error.stderr);
+      if (error.stdout) console.error('STDOUT:', error.stdout);
       return null;
     }
   }
