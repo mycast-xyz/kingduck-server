@@ -160,19 +160,6 @@ export class RelicScraper extends ScraperBase {
       for (const id of setIds) {
         try {
           // Check if relic set already exists in database
-          const existingItem = await prisma.item.findFirst({
-            where: {
-              metadata: {
-                path: ['originalId'],
-                equals: id,
-              },
-            },
-          });
-
-          if (existingItem) {
-            logger.info(`RelicSet ${id} already exists, skipping...`);
-            continue;
-          }
 
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
           const { data: detail } = await axios.get(detailUrl);

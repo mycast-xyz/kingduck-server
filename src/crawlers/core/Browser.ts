@@ -16,11 +16,16 @@ export class Browser {
 
   public async init() {
     if (!this.browser) {
-      logger.info('Launching Puppeteer browser...');
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
+      try {
+        logger.info('Launching Puppeteer browser...');
+        this.browser = await puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+      } catch (error) {
+        logger.error('Failed to launch browser', error);
+        throw error;
+      }
     }
   }
 

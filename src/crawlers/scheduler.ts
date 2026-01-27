@@ -5,6 +5,10 @@ import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicS
 import { YoutubeShortsScraper } from './scrapers/starrail/YoutubeShortsScraper';
 import { YoutubeShortsScraper as Reverse1999YoutubeShortsScraper } from './scrapers/reverse1999/YoutubeShortsScraper';
 import { Reverse1999CharacterScraper } from './scrapers/reverse1999/CharacterScraper';
+import { WutheringWavesCharacterScraper } from './scrapers/wutheringwaves/CharacterScraper';
+import { WutheringWavesWeaponScraper } from './scrapers/wutheringwaves/WeaponScraper';
+import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper';
+import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -18,11 +22,11 @@ async function runCrawlers() {
   const syncService = new DataSyncService();
 
   // 1. Genshin Impact
-  const genshinScraper = new GenshinCharacterScraper('genshin');
-  const genshinData = await genshinScraper.scrape();
-  if (genshinData.length > 0) {
-    await syncService.syncCharacters('genshin', genshinData);
-  }
+  // const genshinScraper = new GenshinCharacterScraper('genshin');
+  // const genshinData = await genshinScraper.scrape();
+  // if (genshinData.length > 0) {
+  //   await syncService.syncCharacters('genshin', genshinData);
+  // }
 
   // 2. Honkai: Star Rail (API Mode)
   // Character
@@ -47,6 +51,7 @@ async function runCrawlers() {
     await syncService.syncVideos('starrail', youtubeData);
   }
 
+  /*
   // 4. Reverse: 1999
   const reverseScraper = new Reverse1999CharacterScraper();
   // We can pass limit/options in valid implementation, but interface doesn't strictly support it in all scrapers yet.
@@ -56,7 +61,7 @@ async function runCrawlers() {
   if (reverseData.length > 0) {
     await syncService.syncCharacters('reverse1999', reverseData);
   }
-
+*/
   // 5. Reverse: 1999 YouTube Shorts (API Mode)
   const reverse1999YoutubeScraper = new Reverse1999YoutubeShortsScraper();
   const reverse1999YoutubeData = await reverse1999YoutubeScraper.scrape();
@@ -64,6 +69,32 @@ async function runCrawlers() {
     await syncService.syncVideos('reverse1999', reverse1999YoutubeData);
   }
 
+  // 6. Wuthering Waves (API Mode)
+  // Character
+  const wwCharScraper = new WutheringWavesCharacterScraper();
+  const wwChars = await wwCharScraper.scrape();
+  if (wwChars.length > 0)
+    await syncService.syncCharacters('wutheringwaves', wwChars);
+
+  /*
+  // Weapon
+  const wwWeaponScraper = new WutheringWavesWeaponScraper();
+  const wwWeapons = await wwWeaponScraper.scrape();
+  if (wwWeapons.length > 0)
+    await syncService.syncItems('wutheringwaves', wwWeapons);
+
+  // Echo
+  const wwEchoScraper = new WutheringWavesEchoScraper();
+  const wwEchoes = await wwEchoScraper.scrape();
+  if (wwEchoes.length > 0)
+    await syncService.syncItems('wutheringwaves', wwEchoes);
+
+  // Item
+  const wwItemScraper = new WutheringWavesItemScraper();
+  const wwItems = await wwItemScraper.scrape();
+  if (wwItems.length > 0)
+    await syncService.syncItems('wutheringwaves', wwItems);
+*/
   // Cleanup
   await browser.close();
   logger.info('=== Crawler Job Finished ===');
@@ -71,7 +102,10 @@ async function runCrawlers() {
 
 // Allow running directly
 if (require.main === module) {
-  runCrawlers().catch((e) => logger.error(e));
+  runCrawlers().catch((e) => {
+    logger.error('Crawler Job Failed', e);
+    console.error('Crawler Job Failed:', e);
+  });
 }
 
 export default runCrawlers;
