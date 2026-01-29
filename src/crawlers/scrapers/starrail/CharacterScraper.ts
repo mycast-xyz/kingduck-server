@@ -15,7 +15,7 @@ export class CharacterScraper extends ScraperBase {
     super('starrail');
   }
 
-  async scrape(): Promise<ScrapedData[]> {
+  async scrape(limit?: number): Promise<ScrapedData[]> {
     logger.info('Starting Star Rail Character scraping (API mode)...');
     const results: ScrapedData[] = [];
 
@@ -23,7 +23,12 @@ export class CharacterScraper extends ScraperBase {
       // 1. Fetch List
       const { data: charMap } = await axios.get(this.LIST_API_URL);
       // charMap is object { id: { ...basic info } }
-      const charIds = Object.keys(charMap);
+      let charIds = Object.keys(charMap);
+
+      if (limit) {
+        charIds = charIds.slice(0, limit);
+      }
+
       logger.info(`Found ${charIds.length} characters.`);
 
       for (const id of charIds) {
@@ -45,7 +50,7 @@ export class CharacterScraper extends ScraperBase {
 
           // Basic info from detail or map
           // detail.Name is the localized character name from Korean API
-          const name = detail.Name || charMap[id].kr || `Char_${id}`;
+          let name = detail.Name || charMap[id].kr || `Char_${id}`;
 
           // Parse rarity from "CombatPowerAvatarRarityType4" -> 4
           let rarity = 4; // default
@@ -57,31 +62,37 @@ export class CharacterScraper extends ScraperBase {
           }
 
           // Check if character already exists in database
-          // Updated check: name, element, path
-          const element = detail.DamageType;
-          const path = detail.BaseType;
-
-          const existingChar = await prisma.character.findFirst({
+          // Updated check: Prioritize originalId in metadata
+          const existingCharById = await prisma.character.findFirst({
             where: {
-              name: name,
               metadata: {
-                path: ['element'],
-                equals: element,
-              },
-              AND: {
-                metadata: {
-                  path: ['path'],
-                  equals: path,
-                },
+                path: ['originalId'],
+                equals: id,
               },
             },
           });
 
-          if (existingChar) {
+          if (existingCharById) {
             logger.info(
-              `Character ${name} (Element: ${element}, Path: ${path}) already exists, skipping...`,
+              `Character ${name} (ID: ${id}) already exists, skipping...`,
             );
             continue;
+          }
+
+          // If ID doesn't exist, check for name collision
+          const existingCharByName = await prisma.character.findFirst({
+            where: {
+              name: name,
+            },
+          });
+
+          // If name exists but ID is new, append Path to name to distinguish variants
+          // e.g. March 7th (Knight) vs March 7th (Rogue)
+          if (existingCharByName) {
+            logger.info(
+              `Name collision for ${name}. Appending path (${detail.BaseType}) to distinguish.`,
+            );
+            name = `${name} (${detail.BaseType})`;
           }
 
           // 3. Images as per updated requirement:
@@ -113,16 +124,32 @@ export class CharacterScraper extends ScraperBase {
             description: detail.Desc,
             metadata: {
               originalId: id,
-              cardImageUrl: localCardUrl, // Full card image
-              rarity: rarity, // Use parsed rarity
-              element: detail.DamageType, // e.g. "Fire", "Ice"
-              path: detail.BaseType, // e.g. "Knight", "Warrior"
+              cardImageUrl: localCardUrl,
+              rarity: rarity,
+              element: detail.DamageType,
+              path: detail.BaseType,
+              camp: detail.CharaInfo?.Camp,
+              stats: detail.Properties, // Base stats (HP, ATK, DEF, Speed, etc.)
+              promotions: detail.Promotions, // Ascension stats map
+              stories: detail.CharaInfo?.Stories, // Background stories
+              voiceLines: detail.CharaInfo?.Voicelines, // Voice lines
               skills: await this.processSkills(
                 detail.Skills,
                 detail.SkillTrees,
               ),
               eidolons: await this.processEidolons(id, detail.Ranks),
               skillTrees: this.processSkillTrees(detail.SkillTrees),
+
+              // Raw backups for completeness
+              skills_raw: detail.Skills,
+              ranks_raw: detail.Ranks,
+              promotions_raw: detail.Promotions,
+
+              // Recommendations
+              teams: detail.Teams,
+              gradings: detail.Gradings, // Relics, Lightcones recommendations
+              lightcones: detail.Lightcones,
+              relics: detail.Relics,
             },
           });
         } catch (innerErr) {

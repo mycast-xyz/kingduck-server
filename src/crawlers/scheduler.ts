@@ -27,7 +27,6 @@ async function runCrawlers() {
   // if (genshinData.length > 0) {
   //   await syncService.syncCharacters('genshin', genshinData);
   // }
-
   /*
   // 2. Honkai: Star Rail (API Mode)
   // Character
@@ -51,7 +50,7 @@ async function runCrawlers() {
   if (youtubeData.length > 0) {
     await syncService.syncVideos('starrail', youtubeData);
   }
-  // 4. Reverse: 1999
+  // 3. Reverse: 1999
   const reverseScraper = new Reverse1999CharacterScraper();
   // We can pass limit/options in valid implementation, but interface doesn't strictly support it in all scrapers yet.
   // The implementation supports it, but ScraperBase definition is scrape().
@@ -67,7 +66,7 @@ async function runCrawlers() {
     await syncService.syncVideos('reverse1999', reverse1999YoutubeData);
   }
 
-  // 6. Wuthering Waves (API Mode)
+  // 4. Wuthering Waves (API Mode)
   // Character
   const wwCharScraper = new WutheringWavesCharacterScraper();
   const wwChars = await wwCharScraper.scrape({});
@@ -77,7 +76,6 @@ async function runCrawlers() {
     await wwCharScraper.save(wwChars);
   }
 
-*/
   // Weapon
   const wwWeaponScraper = new WutheringWavesWeaponScraper();
   const wwWeapons = await wwWeaponScraper.scrape();
@@ -90,13 +88,13 @@ async function runCrawlers() {
   if (wwEchoes.length > 0) {
     await wwEchoScraper.save(wwEchoes);
   }
-  /*
+*/
   // Item
   const wwItemScraper = new WutheringWavesItemScraper();
   const wwItems = await wwItemScraper.scrape();
   if (wwItems.length > 0)
     await syncService.syncItems('wutheringwaves', wwItems);
-*/
+
   // Cleanup
   await browser.close();
   logger.info('=== Crawler Job Finished ===');

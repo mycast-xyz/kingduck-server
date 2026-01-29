@@ -9,6 +9,12 @@ const router = Router();
  *   get:
  *     summary: 아이템 리스트 조회
  *     tags: [Item]
+ *     parameters:
+ *       - in: query
+ *         name: originalId
+ *         schema:
+ *           type: string
+ *         description: Original ID from game metadata
  *     responses:
  *       200:
  *         description: 아이템 리스트 반환 성공

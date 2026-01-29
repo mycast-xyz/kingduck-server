@@ -4,7 +4,8 @@ import logger from '../../utils/logger';
 
 export const getList = async (req: Request, res: Response) => {
   try {
-    const data = await service.getItemList();
+    const { originalId } = req.query;
+    const data = await service.getItemList(originalId as string);
     res.status(200).json(data);
   } catch (error) {
     logger.error(error);
