@@ -28,21 +28,6 @@ export class CharacterScraper extends ScraperBase {
 
       for (const id of charIds) {
         try {
-          // Check if character already exists in database
-          const existingChar = await prisma.character.findFirst({
-            where: {
-              metadata: {
-                path: ['originalId'],
-                equals: id,
-              },
-            },
-          });
-
-          if (existingChar) {
-            logger.info(`Character ${id} already exists, skipping...`);
-            continue;
-          }
-
           // 2. Fetch Detail
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
           const { data: detail } = await axios.get(detailUrl);
@@ -69,6 +54,34 @@ export class CharacterScraper extends ScraperBase {
             if (match) {
               rarity = parseInt(match[1]);
             }
+          }
+
+          // Check if character already exists in database
+          // Updated check: name, element, path
+          const element = detail.DamageType;
+          const path = detail.BaseType;
+
+          const existingChar = await prisma.character.findFirst({
+            where: {
+              name: name,
+              metadata: {
+                path: ['element'],
+                equals: element,
+              },
+              AND: {
+                metadata: {
+                  path: ['path'],
+                  equals: path,
+                },
+              },
+            },
+          });
+
+          if (existingChar) {
+            logger.info(
+              `Character ${name} (Element: ${element}, Path: ${path}) already exists, skipping...`,
+            );
+            continue;
           }
 
           // 3. Images as per updated requirement:

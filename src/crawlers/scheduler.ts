@@ -28,6 +28,7 @@ async function runCrawlers() {
   //   await syncService.syncCharacters('genshin', genshinData);
   // }
 
+  /*
   // 2. Honkai: Star Rail (API Mode)
   // Character
   const srCharScraper = new StarRailCharacterScraper();
@@ -50,8 +51,6 @@ async function runCrawlers() {
   if (youtubeData.length > 0) {
     await syncService.syncVideos('starrail', youtubeData);
   }
-
-  /*
   // 4. Reverse: 1999
   const reverseScraper = new Reverse1999CharacterScraper();
   // We can pass limit/options in valid implementation, but interface doesn't strictly support it in all scrapers yet.
@@ -61,7 +60,6 @@ async function runCrawlers() {
   if (reverseData.length > 0) {
     await syncService.syncCharacters('reverse1999', reverseData);
   }
-*/
   // 5. Reverse: 1999 YouTube Shorts (API Mode)
   const reverse1999YoutubeScraper = new Reverse1999YoutubeShortsScraper();
   const reverse1999YoutubeData = await reverse1999YoutubeScraper.scrape();
@@ -72,23 +70,27 @@ async function runCrawlers() {
   // 6. Wuthering Waves (API Mode)
   // Character
   const wwCharScraper = new WutheringWavesCharacterScraper();
-  const wwChars = await wwCharScraper.scrape();
-  if (wwChars.length > 0)
-    await syncService.syncCharacters('wutheringwaves', wwChars);
+  const wwChars = await wwCharScraper.scrape({});
 
-  /*
+  if (wwChars.length > 0) {
+    // Use the built-in save method which handles duplicate logic (update skins)
+    await wwCharScraper.save(wwChars);
+  }
+
+*/
   // Weapon
   const wwWeaponScraper = new WutheringWavesWeaponScraper();
   const wwWeapons = await wwWeaponScraper.scrape();
-  if (wwWeapons.length > 0)
-    await syncService.syncItems('wutheringwaves', wwWeapons);
-
+  if (wwWeapons.length > 0) {
+    await wwWeaponScraper.save(wwWeapons);
+  }
   // Echo
   const wwEchoScraper = new WutheringWavesEchoScraper();
   const wwEchoes = await wwEchoScraper.scrape();
-  if (wwEchoes.length > 0)
-    await syncService.syncItems('wutheringwaves', wwEchoes);
-
+  if (wwEchoes.length > 0) {
+    await wwEchoScraper.save(wwEchoes);
+  }
+  /*
   // Item
   const wwItemScraper = new WutheringWavesItemScraper();
   const wwItems = await wwItemScraper.scrape();

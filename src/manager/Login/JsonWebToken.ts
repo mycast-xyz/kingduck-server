@@ -4,7 +4,7 @@ const secretKey = config.JWT_SECRET_KEY;
 
 interface TokenPayload {
   userId: string;
-  isAdmin: boolean;
+  role: string; // Changed from isAdmin
   userName: string;
   userUUID: string;
 }
@@ -23,7 +23,7 @@ const refreshToken = (token: string): string | null => {
     // 새로운 페이로드 생성
     const payload: TokenPayload = {
       userId: decoded.userId,
-      isAdmin: decoded.isAdmin,
+      role: decoded.role,
       userName: decoded.userName,
       userUUID: decoded.userUUID,
     };

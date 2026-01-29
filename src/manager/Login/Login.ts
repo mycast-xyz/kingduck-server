@@ -28,7 +28,7 @@ export class Login {
     userId: string,
     userName: string,
     userUUID: string,
-    isAdmin: boolean,
+    role: string,
   ): Promise<LoginResult> {
     try {
       // 비밀번호 확인
@@ -44,7 +44,7 @@ export class Login {
       // JWT 토큰 생성
       const token = generateToken({
         userId: userId,
-        isAdmin: isAdmin,
+        role: role,
         userName: userName,
         userUUID: userUUID,
       });
