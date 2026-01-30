@@ -61,38 +61,27 @@ export class CharacterScraper extends ScraperBase {
             }
           }
 
-          // Check if character already exists in database
-          // Updated check: Prioritize originalId in metadata
-          const existingCharById = await prisma.character.findFirst({
-            where: {
-              metadata: {
-                path: ['originalId'],
-                equals: id,
-              },
-            },
-          });
-
-          if (existingCharById) {
-            logger.info(
-              `Character ${name} (ID: ${id}) already exists, skipping...`,
-            );
-            continue;
-          }
-
-          // If ID doesn't exist, check for name collision
+          // Check for name collision to distinguish variants (e.g., March 7th variants)
+          // Don't skip existing characters - let DataSyncService handle upserts
           const existingCharByName = await prisma.character.findFirst({
             where: {
               name: name,
+              gameId: (
+                await prisma.game.findUnique({ where: { slug: 'starrail' } })
+              )?.id,
             },
           });
 
-          // If name exists but ID is new, append Path to name to distinguish variants
-          // e.g. March 7th (Knight) vs March 7th (Rogue)
+          // If name exists but with different ID, append Path to distinguish variants
           if (existingCharByName) {
-            logger.info(
-              `Name collision for ${name}. Appending path (${detail.BaseType}) to distinguish.`,
-            );
-            name = `${name} (${detail.BaseType})`;
+            const existingOriginalId = (existingCharByName.metadata as any)
+              ?.originalId;
+            if (existingOriginalId && existingOriginalId !== id) {
+              logger.info(
+                `Name collision for ${name}. Appending path (${detail.BaseType}) to distinguish.`,
+              );
+              name = `${name} (${detail.BaseType})`;
+            }
           }
 
           // 3. Images as per updated requirement:
@@ -129,7 +118,7 @@ export class CharacterScraper extends ScraperBase {
               element: detail.DamageType,
               path: detail.BaseType,
               camp: detail.CharaInfo?.Camp,
-              stats: detail.Properties, // Base stats (HP, ATK, DEF, Speed, etc.)
+              stats: detail.Stats, // Base stats (HP, ATK, DEF, Speed, etc.)
               promotions: detail.Promotions, // Ascension stats map
               stories: detail.CharaInfo?.Stories, // Background stories
               voiceLines: detail.CharaInfo?.Voicelines, // Voice lines
