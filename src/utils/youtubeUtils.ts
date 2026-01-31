@@ -79,9 +79,22 @@ class YoutubeUtils {
       // We can try to use just 'yt-dlp' if it's in PATH, but spawn might not catch it if PATH isn't inherited perfectly in dev env.
       // Let's assume 'yt-dlp' is in PATH.
 
-      const youtubedl = youtubedlFactory('yt-dlp');
-
       const saveDirectory = path.join(__dirname, '../../static/video/');
+
+      // Check for local binary in bin directory (project root/bin/yt-dlp.exe)
+      const localBinaryPath = path.resolve(process.cwd(), 'bin', 'yt-dlp.exe');
+      let ytDlpPath = 'yt-dlp'; // Default to global path
+
+      if (fs.existsSync(localBinaryPath)) {
+        console.log(`Using local yt-dlp binary: ${localBinaryPath}`);
+        ytDlpPath = localBinaryPath;
+      } else {
+        console.log(
+          'Using global yt-dlp (local binary not found in bin/yt-dlp.exe)',
+        );
+      }
+
+      const youtubedl = youtubedlFactory(ytDlpPath);
 
       if (!fs.existsSync(saveDirectory)) {
         fs.mkdirSync(saveDirectory, { recursive: true });

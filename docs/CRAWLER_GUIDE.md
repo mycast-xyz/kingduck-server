@@ -27,19 +27,35 @@
 
 ### 3. 동영상 스크래퍼 (YouTube)
 
-**경로**: `src/crawlers/scrapers/starrail/YoutubeShortsScraper.ts`
+- **경로**: `src/crawlers/scrapers/wutheringwaves/YoutubeShortsScraper.ts`
+- **기능**:
+  - 공식 채널(`@WW_KR_Official`)에서 Shorts 동영상을 수집합니다.
+  - **키워드 매칭**: "공명자 화면", "공명자 모먼트" 등의 키워드가 포함된 영상을 필터링합니다.
+  - **캐릭터 매칭**: 제목/설명의 해시태그와 DB의 캐릭터 이름을 대조하여 연결합니다.
+  - `src/utils/youtubeUtils.ts`를 통해 `yt-dlp`로 동영상을 다운로드합니다.
 
-**기능**:
+### 4. 동영상 다운로드 설정 (Video Download Setup)
 
-- `src/utils/youtubeUtils.ts`를 사용합니다.
-- **시스템 yt-dlp 사용**: 안정성을 위해 시스템에 설치된 `yt-dlp` 바이너리를 직접 래핑(Wrapping)하여 사용합니다.
-- Shorts 및 동영상을 `static/video` 폴더에 다운로드합니다.
+`yt-dlp`는 동영상을 다운로드하기 위해 필수적입니다. 운영체제에 맞는 설정이 필요합니다.
+
+#### 🪟 Windows
+
+- **자동 설치**: `scripts/setup_ytdlp.bat` 실행.
+- **상세 가이드**: [`docs/YOUTUBE_DOWNLOADER_SETUP.md`](YOUTUBE_DOWNLOADER_SETUP.md) 참조.
+
+#### 🐧 Linux (Ubuntu) / 🍎 macOS
+
+- **스크립트 설치**: `scripts/init_ubuntu.sh`를 실행하면 자동으로 설치됩니다.
+- **수동 설치**:
+  - **Ubuntu**: `sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && sudo chmod a+rx /usr/local/bin/yt-dlp`
+  - **macOS**: `brew install yt-dlp`
 
 ## 문제 해결 (Troubleshooting)
 
 ### 동영상 다운로드 실패
 
-만약 `yt-dlp` 관련 에러가 발생한다면:
+만약 `spawn yt-dlp ENOENT` 에러가 발생한다면:
 
-1. `yt-dlp`가 설치되어 있는지 확인하세요: `brew install yt-dlp` 또는 `scripts/init_ubuntu.sh` 실행.
-2. 서버에서 YouTube 로의 네트워크 연결 상태를 확인하세요.
+1. **Windows**: `scripts/setup_ytdlp.bat`을 실행하여 `bin/yt-dlp.exe`를 설치하세요.
+2. **Linux/Mac**: `yt-dlp`가 설치되어 있는지 확인하세요 (`yt-dlp --version`). 없으면 설치하세요.
+3. `src/utils/youtubeUtils.ts`가 로컬 바이너리(Windows) 또는 시스템 PATH(Linux/Mac)를 참조하는지 확인하세요.

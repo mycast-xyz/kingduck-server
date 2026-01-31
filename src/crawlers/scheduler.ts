@@ -10,6 +10,7 @@ import { WutheringWavesCharacterScraper } from './scrapers/wutheringwaves/Charac
 import { WutheringWavesWeaponScraper } from './scrapers/wutheringwaves/WeaponScraper';
 import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper';
 import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
+import { YoutubeShortsScraper as WutheringWavesYoutubeShortsScraper } from './scrapers/wutheringwaves/YoutubeShortsScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -170,6 +171,15 @@ async function runCrawlers() {
         const scraper = new WutheringWavesItemScraper();
         const data = await scraper.scrape();
         if (data.length > 0) await s.syncItems('wutheringwaves', data);
+      },
+    },
+    {
+      game: 'wutheringwaves',
+      type: 'video',
+      run: async (s) => {
+        const scraper = new WutheringWavesYoutubeShortsScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncVideos('wutheringwaves', data);
       },
     },
   ];

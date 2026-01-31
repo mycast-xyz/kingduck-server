@@ -37,10 +37,15 @@ async function main() {
       name: '리버스: 1999',
       icon: 'reverse1999.webp',
     },
+    {
+      slug: 'endfield',
+      name: '명일방주:엔드필드',
+      icon: 'endfield.webp',
+    },
   ];
 
   for (const g of games) {
-    const iconUrl = `${BASE_URL}/${g.icon}`;
+    const iconUrl = `${g.icon}`;
 
     // Check if file exists logic could be here, but we trust the listing
 
