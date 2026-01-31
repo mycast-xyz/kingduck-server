@@ -62,7 +62,16 @@ export class WutheringWavesItemScraper extends ScraperBase {
         list = list.slice(0, limit);
       }
 
+      let processedScrape = 0;
+      const totalScrape = list.length;
+
       for (const item of list) {
+        processedScrape++;
+        if (processedScrape % 10 === 0 || processedScrape === totalScrape) {
+          logger.info(
+            `[WW-Item] Scraping progress: ${processedScrape}/${totalScrape} (${((processedScrape / totalScrape) * 100).toFixed(1)}%)`,
+          );
+        }
         const detailUrl = `${BASE_API_URL}/item/${item.Id}`;
         let rawDetailData = item;
         try {
@@ -79,7 +88,7 @@ export class WutheringWavesItemScraper extends ScraperBase {
 
         results.push({
           gameId: gameId,
-          type: 'Item',
+          type: item.TypeName || 'Item',
           name: detailData.Name,
           sourceUrl: detailUrl,
           imageUrl: localImageUrl,
@@ -110,8 +119,16 @@ export class WutheringWavesItemScraper extends ScraperBase {
     logger.info(`Saving ${data.length} items to database...`);
     let createdCount = 0;
     let skippedCount = 0;
+    let processedSave = 0;
+    const totalSave = data.length;
 
     for (const item of data) {
+      processedSave++;
+      if (processedSave % 20 === 0 || processedSave === totalSave) {
+        logger.info(
+          `[WW-Item] Saving progress: ${processedSave}/${totalSave} (${((processedSave / totalSave) * 100).toFixed(1)}%)`,
+        );
+      }
       try {
         const metadata = item.metadata as any;
         const originalId = metadata?.originalId;
@@ -145,13 +162,13 @@ export class WutheringWavesItemScraper extends ScraperBase {
             },
           });
           createdCount++;
-          logger.info(`Created new item: ${item.name}`);
+          // logger.info(`Created new item: ${item.name}`); // Too verbose
         } else {
           // Optional: Update if needed, here just skipping as per EchoScraper pattern
           skippedCount++;
-          logger.info(
-            `Duplicate found for ${item.name} (originalId: ${originalId}). Skipped.`,
-          );
+          // logger.info(
+          //   `Duplicate found for ${item.name} (originalId: ${originalId}). Skipped.`,
+          // );
         }
       } catch (e) {
         logger.error(`Failed to save item ${item.name}:`, e);

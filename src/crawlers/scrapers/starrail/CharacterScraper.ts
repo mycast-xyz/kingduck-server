@@ -31,7 +31,14 @@ export class CharacterScraper extends ScraperBase {
 
       logger.info(`Found ${charIds.length} characters.`);
 
+      let processedCount = 0;
+      const totalCount = charIds.length;
+
       for (const id of charIds) {
+        processedCount++;
+        logger.info(
+          `[SR-Char] Processing character ${processedCount}/${totalCount} (ID: ${id}) - ${((processedCount / totalCount) * 100).toFixed(1)}%`,
+        );
         try {
           // 2. Fetch Detail
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;

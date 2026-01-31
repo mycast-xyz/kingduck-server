@@ -15,6 +15,11 @@ const router = Router();
  *         schema:
  *           type: string
  *         description: Original ID from game metadata
+ *       - in: query
+ *         name: gameId
+ *         schema:
+ *           type: integer
+ *         description: Game ID
  *     responses:
  *       200:
  *         description: 아이템 리스트 반환 성공

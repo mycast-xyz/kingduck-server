@@ -1,7 +1,11 @@
 import { prisma } from '../../utils/prisma';
 
-export const getItemList = async (originalId?: string) => {
+export const getItemList = async (originalId?: string, gameId?: number) => {
   const where: any = {};
+
+  if (gameId) {
+    where.gameId = gameId;
+  }
 
   if (originalId) {
     // Try to match strict string or number inside metadata.originalId

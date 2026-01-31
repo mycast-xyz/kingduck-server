@@ -70,7 +70,15 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
 
       const results: any[] = [];
 
+      let processedCount = 0;
+      const totalCount = list.length;
+
       for (const item of list) {
+        processedCount++;
+        logger.info(
+          `[WW-Char] Processing character ${processedCount}/${totalCount} (${item.Name}) - ${((processedCount / totalCount) * 100).toFixed(1)}%`,
+        );
+
         try {
           // 3. Fetch Detail
           // Note: The list item ID key might be 'Id' or 'id' depending on API consistentcy.
@@ -149,7 +157,7 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
           };
 
           results.push(mappedItem);
-          logger.info(`Processed and mapped character: ${item.Name}`);
+          // logger.info(`Processed and mapped character: ${item.Name}`); // Removed to avoid duplicate logging
         } catch (charError) {
           logger.error(`Error processing character ${item.Id}:`, charError);
         }

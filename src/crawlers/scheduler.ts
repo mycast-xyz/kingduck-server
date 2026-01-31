@@ -2,6 +2,7 @@ import { GenshinCharacterScraper } from './scrapers/genshin/character';
 import { CharacterScraper as StarRailCharacterScraper } from './scrapers/starrail/CharacterScraper';
 import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrail/LightConeScraper';
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
+import { StarRailItemScraper } from './scrapers/starrail/ItemScraper';
 import { YoutubeShortsScraper } from './scrapers/starrail/YoutubeShortsScraper';
 import { YoutubeShortsScraper as Reverse1999YoutubeShortsScraper } from './scrapers/reverse1999/YoutubeShortsScraper';
 import { Reverse1999CharacterScraper } from './scrapers/reverse1999/CharacterScraper';
@@ -13,87 +14,180 @@ import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
 
+// Type definition for scraper task
+type ScraperTask = {
+  game: string;
+  type: string; // 'character', 'item', 'weapon', 'echo', 'video', etc.
+  run: (syncService: DataSyncService) => Promise<void>;
+};
+
 async function runCrawlers() {
   logger.info('=== Crawler Job Started ===');
+
+  // Parse arguments
+  const args = process.argv.slice(2);
+  let gameFilter: string | null = null;
+  let typeFilter: string | null = null;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--game' && args[i + 1]) {
+      gameFilter = args[i + 1].toLowerCase();
+      i++;
+    }
+    if (args[i] === '--type' && args[i + 1]) {
+      typeFilter = args[i + 1].toLowerCase();
+      i++;
+    }
+  }
+
+  if (gameFilter) logger.info(`Filter: Game = ${gameFilter}`);
+  if (typeFilter) logger.info(`Filter: Type = ${typeFilter}`);
 
   const browser = Browser.getInstance();
   await browser.init();
 
   const syncService = new DataSyncService();
 
-  // 1. Genshin Impact
-  // const genshinScraper = new GenshinCharacterScraper('genshin');
-  // const genshinData = await genshinScraper.scrape();
-  // if (genshinData.length > 0) {
-  //   await syncService.syncCharacters('genshin', genshinData);
-  // }
-  /*
-  // 2. Honkai: Star Rail (API Mode)
-  // Character
-  const srCharScraper = new StarRailCharacterScraper();
-  const srChars = await srCharScraper.scrape();
-  if (srChars.length > 0) await syncService.syncCharacters('starrail', srChars);
+  // Define all tasks
+  const tasks: ScraperTask[] = [
+    // --- Genshin Impact ---
+    // {
+    //   game: 'genshin',
+    //   type: 'character',
+    //   run: async (s) => {
+    //     const scraper = new GenshinCharacterScraper('genshin');
+    //     const data = await scraper.scrape();
+    //     if (data.length > 0) await s.syncCharacters('genshin', data);
+    //   },
+    // },
 
-  // LightCone (API Mode)
-  const srLCScraper = new StarRailLightConeScraper();
-  const srLCs = await srLCScraper.scrape();
-  if (srLCs.length > 0) await syncService.syncItems('starrail', srLCs);
+    // --- Honkai: Star Rail ---
+    {
+      game: 'starrail',
+      type: 'character',
+      run: async (s) => {
+        const scraper = new StarRailCharacterScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncCharacters('starrail', data);
+      },
+    },
+    {
+      game: 'starrail',
+      type: 'item', // LightCone is technically an item
+      run: async (s) => {
+        const scraper = new StarRailLightConeScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncItems('starrail', data);
+      },
+    },
+    {
+      game: 'starrail',
+      type: 'relic',
+      run: async (s) => {
+        const scraper = new StarRailRelicScraper();
+        await scraper.scrape();
+        // Item sync logic for relics is pending or inside scraper?
+        // Original code had no sync call for relics
+      },
+    },
+    {
+      game: 'starrail',
+      type: 'item', // General Items
+      run: async (s) => {
+        const scraper = new StarRailItemScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) {
+          await scraper.save(data);
+        }
+      },
+    },
+    {
+      game: 'starrail',
+      type: 'video',
+      run: async (s) => {
+        const scraper = new YoutubeShortsScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncVideos('starrail', data);
+      },
+    },
 
-  // Relic (Temporarily disabled)
-  const srRelicScraper = new StarRailRelicScraper();
-  const srRelics = await srRelicScraper.scrape();
-  // TODO: Sync method for relics
+    // --- Reverse: 1999 ---
+    {
+      game: 'reverse1999',
+      type: 'character',
+      run: async (s) => {
+        const scraper = new Reverse1999CharacterScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncCharacters('reverse1999', data);
+      },
+    },
+    {
+      game: 'reverse1999',
+      type: 'video',
+      run: async (s) => {
+        const scraper = new Reverse1999YoutubeShortsScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncVideos('reverse1999', data);
+      },
+    },
 
-  // YouTube Shorts (API Mode)
-  const youtubeScraper = new YoutubeShortsScraper();
-  const youtubeData = await youtubeScraper.scrape();
-  if (youtubeData.length > 0) {
-    await syncService.syncVideos('starrail', youtubeData);
-  }
-  // 3. Reverse: 1999
-  const reverseScraper = new Reverse1999CharacterScraper();
-  // We can pass limit/options in valid implementation, but interface doesn't strictly support it in all scrapers yet.
-  // The implementation supports it, but ScraperBase definition is scrape().
-  // We'll call it without args for full crawl.
-  const reverseData = await reverseScraper.scrape();
-  if (reverseData.length > 0) {
-    await syncService.syncCharacters('reverse1999', reverseData);
-  }
-  // 5. Reverse: 1999 YouTube Shorts (API Mode)
-  const reverse1999YoutubeScraper = new Reverse1999YoutubeShortsScraper();
-  const reverse1999YoutubeData = await reverse1999YoutubeScraper.scrape();
-  if (reverse1999YoutubeData.length > 0) {
-    await syncService.syncVideos('reverse1999', reverse1999YoutubeData);
+    // --- Wuthering Waves ---
+    {
+      game: 'wutheringwaves',
+      type: 'character',
+      run: async (s) => {
+        const scraper = new WutheringWavesCharacterScraper();
+        const data = await scraper.scrape({});
+        if (data.length > 0) await scraper.save(data);
+      },
+    },
+    {
+      game: 'wutheringwaves',
+      type: 'weapon',
+      run: async (s) => {
+        const scraper = new WutheringWavesWeaponScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await scraper.save(data);
+      },
+    },
+    {
+      game: 'wutheringwaves',
+      type: 'echo',
+      run: async (s) => {
+        const scraper = new WutheringWavesEchoScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await scraper.save(data);
+      },
+    },
+    {
+      game: 'wutheringwaves',
+      type: 'item',
+      run: async (s) => {
+        const scraper = new WutheringWavesItemScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncItems('wutheringwaves', data);
+      },
+    },
+  ];
+
+  // Execute tasks
+  let taskCount = 0;
+  for (const task of tasks) {
+    if (gameFilter && task.game !== gameFilter) continue;
+    if (typeFilter && task.type !== typeFilter) continue;
+
+    logger.info(`>>> Running task: [${task.game}] ${task.type}`);
+    try {
+      await task.run(syncService);
+      taskCount++;
+    } catch (e) {
+      logger.error(`Task [${task.game}] ${task.type} failed:`, e);
+    }
   }
 
-  // 4. Wuthering Waves (API Mode)
-  // Character
-  const wwCharScraper = new WutheringWavesCharacterScraper();
-  const wwChars = await wwCharScraper.scrape({});
-
-  if (wwChars.length > 0) {
-    // Use the built-in save method which handles duplicate logic (update skins)
-    await wwCharScraper.save(wwChars);
+  if (taskCount === 0) {
+    logger.warn('No tasks matched the filters or checks.');
   }
-
-  // Weapon
-  const wwWeaponScraper = new WutheringWavesWeaponScraper();
-  const wwWeapons = await wwWeaponScraper.scrape();
-  if (wwWeapons.length > 0) {
-    await wwWeaponScraper.save(wwWeapons);
-  }
-  // Echo
-  const wwEchoScraper = new WutheringWavesEchoScraper();
-  const wwEchoes = await wwEchoScraper.scrape();
-  if (wwEchoes.length > 0) {
-    await wwEchoScraper.save(wwEchoes);
-  }
-*/
-  // Item
-  const wwItemScraper = new WutheringWavesItemScraper();
-  const wwItems = await wwItemScraper.scrape();
-  if (wwItems.length > 0)
-    await syncService.syncItems('wutheringwaves', wwItems);
 
   // Cleanup
   await browser.close();

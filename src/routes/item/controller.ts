@@ -4,8 +4,11 @@ import logger from '../../utils/logger';
 
 export const getList = async (req: Request, res: Response) => {
   try {
-    const { originalId } = req.query;
-    const data = await service.getItemList(originalId as string);
+    const { originalId, gameId } = req.query;
+    const data = await service.getItemList(
+      originalId as string,
+      gameId ? Number(gameId) : undefined,
+    );
     res.status(200).json(data);
   } catch (error) {
     logger.error(error);
