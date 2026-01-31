@@ -11,6 +11,7 @@ import { WutheringWavesWeaponScraper } from './scrapers/wutheringwaves/WeaponScr
 import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper';
 import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
 import { YoutubeShortsScraper as WutheringWavesYoutubeShortsScraper } from './scrapers/wutheringwaves/YoutubeShortsScraper';
+import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -62,7 +63,6 @@ async function runCrawlers() {
     //   },
     // },
 
-    /*
     // --- Honkai: Star Rail ---
     {
       game: 'starrail',
@@ -112,9 +112,7 @@ async function runCrawlers() {
         if (data.length > 0) await s.syncVideos('starrail', data);
       },
     },
-    */
 
-    /*
     // --- Reverse: 1999 ---
     {
       game: 'reverse1999',
@@ -134,7 +132,6 @@ async function runCrawlers() {
         if (data.length > 0) await s.syncVideos('reverse1999', data);
       },
     },
-    */
 
     // --- Wuthering Waves ---
     {
@@ -180,6 +177,15 @@ async function runCrawlers() {
         const scraper = new WutheringWavesYoutubeShortsScraper();
         const data = await scraper.scrape();
         if (data.length > 0) await s.syncVideos('wutheringwaves', data);
+      },
+    },
+    {
+      game: 'endfield',
+      type: 'video',
+      run: async (s) => {
+        const scraper = new EndfieldYoutubeShortsScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) await s.syncVideos('endfield', data);
       },
     },
   ];
