@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import logger from '../../utils/logger';
 
 const STATIC_DIR = path.join(process.cwd(), 'static');
 const BASE_IMG_URL = 'https://api-v2.encore.moe/resource/Data';
@@ -65,22 +66,29 @@ export class WutheringWavesDownloader {
           : originalPath;
       }
 
-      // Force change extension to .webp for local storage and reference
+      // Determine extension and handling
+      const ext = path.extname(pathSuffix).toLowerCase();
+      const isVideo = ext === '.mp4' || ext === '.webm';
+
       const dirName = path.dirname(pathSuffix);
-      const name = path.basename(pathSuffix, path.extname(pathSuffix));
-      const webpPathSuffix = path.join(dirName, `${name}.webp`);
+      const name = path.basename(pathSuffix, ext);
+
+      // Use original extension for video, .webp for images
+      const finalExt = isVideo ? ext : '.webp';
+      const finalPathSuffix = path.join(dirName, `${name}${finalExt}`);
 
       const jsonRef = path.join(
         'assets',
         'resource',
         'wutheringwaves',
-        webpPathSuffix,
+        finalPathSuffix,
       );
       const storageRelPath = path.join(
         'resource',
         'wutheringwaves',
-        webpPathSuffix,
+        finalPathSuffix,
       );
+
       const localFullPath = path.join(STATIC_DIR, storageRelPath);
       const localDir = path.dirname(localFullPath);
 
@@ -96,14 +104,25 @@ export class WutheringWavesDownloader {
         url: fullUrl,
         method: 'GET',
         responseType: 'arraybuffer',
+        timeout: 10000,
       });
 
-      // 6. Convert to WebP and Save
-      await sharp(response.data).webp({ quality: 80 }).toFile(localFullPath);
+      // 6. Save (Convert if image, Raw if video)
+      if (isVideo) {
+        fs.writeFileSync(localFullPath, response.data);
+      } else {
+        await sharp(response.data).webp({ quality: 80 }).toFile(localFullPath);
+      }
 
       return jsonRef;
     } catch (error) {
-      //   console.error(`Failed to download ${fullUrl}:`, error);
+      if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+        logger.warn(`Download timed out for ${fullUrl}`);
+      } else {
+        logger.warn(
+          `Failed to download ${fullUrl}: ${(error as Error).message}`,
+        );
+      }
       return url;
     }
   }

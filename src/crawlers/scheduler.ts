@@ -61,6 +61,7 @@ async function runCrawlers() {
     //   },
     // },
 
+    /*
     // --- Honkai: Star Rail ---
     {
       game: 'starrail',
@@ -110,7 +111,9 @@ async function runCrawlers() {
         if (data.length > 0) await s.syncVideos('starrail', data);
       },
     },
+    */
 
+    /*
     // --- Reverse: 1999 ---
     {
       game: 'reverse1999',
@@ -130,6 +133,7 @@ async function runCrawlers() {
         if (data.length > 0) await s.syncVideos('reverse1999', data);
       },
     },
+    */
 
     // --- Wuthering Waves ---
     {

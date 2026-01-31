@@ -45,6 +45,27 @@ export const getCharacter = async (gameSlug: string, id: number) => {
   });
 };
 
+export const getCharacterByOriginalId = async (
+  gameId: number,
+  originalId: string,
+) => {
+  return await prisma.character.findFirst({
+    where: {
+      gameId,
+      metadata: {
+        path: ['originalId'],
+        equals: originalId,
+      },
+    },
+    include: {
+      game: true,
+      element: true,
+      path: true,
+      videos: true,
+    },
+  });
+};
+
 export const getElementList = async (gameSlug: string) => {
   return await prisma.element.findMany({
     where: {

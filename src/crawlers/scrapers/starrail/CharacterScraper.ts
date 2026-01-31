@@ -68,29 +68,6 @@ export class CharacterScraper extends ScraperBase {
             }
           }
 
-          // Check for name collision to distinguish variants (e.g., March 7th variants)
-          // Don't skip existing characters - let DataSyncService handle upserts
-          const existingCharByName = await prisma.character.findFirst({
-            where: {
-              name: name,
-              gameId: (
-                await prisma.game.findUnique({ where: { slug: 'starrail' } })
-              )?.id,
-            },
-          });
-
-          // If name exists but with different ID, append Path to distinguish variants
-          if (existingCharByName) {
-            const existingOriginalId = (existingCharByName.metadata as any)
-              ?.originalId;
-            if (existingOriginalId && existingOriginalId !== id) {
-              logger.info(
-                `Name collision for ${name}. Appending path (${detail.BaseType}) to distinguish.`,
-              );
-              name = `${name} (${detail.BaseType})`;
-            }
-          }
-
           // 3. Images as per updated requirement:
           // List Icon: https://api.hakush.in/hsr/UI/avatarshopicon/{id}.webp
           const iconRemoteUrl = `https://api.hakush.in/hsr/UI/avatarshopicon/${id}.webp`;

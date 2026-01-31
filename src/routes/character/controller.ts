@@ -48,3 +48,28 @@ export const getDetail = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
+export const getDetailByOriginalId = async (req: Request, res: Response) => {
+  try {
+    const { gameId, originalId } = req.params as {
+      gameId: string;
+      originalId: string;
+    };
+
+    const gId = Number(gameId);
+    if (isNaN(gId)) {
+      return res.status(400).json({ message: 'Invalid game ID' });
+    }
+
+    const data = await service.getCharacterByOriginalId(gId, originalId);
+
+    if (!data) {
+      return res.status(404).json({ message: 'Character not found' });
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};

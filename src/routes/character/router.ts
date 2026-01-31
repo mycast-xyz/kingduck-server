@@ -80,4 +80,31 @@ router.get('/:gameSlug/list', controller.getList);
  */
 router.get('/:gameSlug/:id', controller.getDetail);
 
+/**
+ * @swagger
+ * /api/v0/character/{gameId}/original/{originalId}:
+ *   get:
+ *     summary: 캐릭터 상세 조회 (Original ID)
+ *     tags: [Character]
+ *     parameters:
+ *       - in: path
+ *         name: gameId
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: number (게임 ID)
+ *       - in: path
+ *         name: originalId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: string (Metadata Original ID)
+ *     responses:
+ *       200:
+ *         description: 캐릭터 상세 정보 반환 성공
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ */
+router.get('/:gameId/original/:originalId', controller.getDetailByOriginalId);
+
 export default router;

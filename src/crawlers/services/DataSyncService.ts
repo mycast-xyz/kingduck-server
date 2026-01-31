@@ -79,18 +79,10 @@ export class DataSyncService {
         const existing = await prisma.character.findFirst({
           where: {
             gameId: game.id,
-            OR: [
-              {
-                metadata: {
-                  path: ['originalId'],
-                  equals: originalId,
-                },
-              },
-              // Fallback: Check by name if originalId check fails (sometimes string vs int issues in Prisma JSON)
-              {
-                name: item.name,
-              },
-            ],
+            metadata: {
+              path: ['originalId'],
+              equals: originalId,
+            },
           },
         });
 
