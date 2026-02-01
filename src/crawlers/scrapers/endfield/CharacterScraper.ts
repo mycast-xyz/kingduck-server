@@ -225,6 +225,39 @@ export class EndfieldCharacterScraper extends ScraperBase {
             pathId = pathIdMap[weaponType];
           }
 
+          // Skill Icons Download
+          const extractIconIds = (obj: any): string[] => {
+            const icons: string[] = [];
+            if (!obj) return icons;
+
+            if (Array.isArray(obj)) {
+              obj.forEach((item) => icons.push(...extractIconIds(item)));
+            } else if (typeof obj === 'object') {
+              if (obj.iconId && typeof obj.iconId === 'string') {
+                icons.push(obj.iconId);
+              }
+              for (const key in obj) {
+                icons.push(...extractIconIds(obj[key]));
+              }
+            }
+            return icons;
+          };
+
+          const iconIds = extractIconIds(resolvedDetail);
+          const uniqueIconIds = Array.from(new Set(iconIds)); // Deduplicate
+
+          for (const iconId of uniqueIconIds) {
+            if (!iconId) continue;
+            // https://endfieldtools.dev/assets/images/endfield/skillicon/icon_talent_lastrite_01.png
+            const remoteSkillUrl = `https://endfieldtools.dev/assets/images/endfield/skillicon/${iconId}.png`;
+            await ImageDownloader.downloadAndSave(
+              remoteSkillUrl,
+              'endfield',
+              'skill',
+              iconId,
+            );
+          }
+
           // Download Images
           // Portrait Icon
           const remoteIconUrl = getPortraitUrl(charId);

@@ -1,12 +1,12 @@
-import { WutheringWavesCharacterScraper } from './scrapers/wutheringwaves/CharacterScraper';
+import { EndfieldCharacterScraper } from './scrapers/endfield/CharacterScraper';
 import { prisma } from '../utils/prisma';
 
 async function main() {
-  const scraper = new WutheringWavesCharacterScraper();
+  const scraper = new EndfieldCharacterScraper();
 
   // 1. Scrape
   console.log('Running Scrape...');
-  const data = await scraper.scrape({ limit: 1 });
+  const data = await scraper.scrape();
   console.log(`Scraped ${data.length} items.`);
 
   // 2. Save
