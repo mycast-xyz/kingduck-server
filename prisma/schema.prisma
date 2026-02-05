@@ -19,8 +19,40 @@ model Game {
   characters Character[]
   items      Item[]
   videos     Video[]
+  calendarEvents CalendarEvent[]
 
   @@map("games")
+}
+
+enum EventType {
+  GACHA        // 캐릭터/무기 픽업
+  EVENT        // 인게임 이벤트
+  MAINTENANCE  // 업데이트 및 점검
+  SPECIAL      // 방송, 오프라인 행사
+}
+
+model CalendarEvent {
+  id           Int       @id @default(autoincrement())
+  gameId       Int       @map("game_id")
+  type         EventType
+  title        String
+  startTime    DateTime
+  endTime      DateTime?
+  
+  imageUrl     String?   @map("image_url")
+  officialLink String?   @map("official_link")
+  
+  targetId     String?   @map("target_id")
+  metadata     Json?     
+  
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  game         Game      @relation(fields: [gameId], references: [id])
+
+  @@map("calendar_events")
+  @@index([gameId, startTime])
+  @@index([type])
 }
 
 model Element {
@@ -50,6 +82,7 @@ model Character {
   rarity     Int?    // 예: 4, 5
   weaponType String? // 예: "Sword", "AR", "Rectifier" (Generic weapon type)
   role       String? // 예: "DPS", "Support", "Defender"
+  originalId String? @map("original_id")
 
   description String? @db.Text
   imageUrl    String? @map("image_url")

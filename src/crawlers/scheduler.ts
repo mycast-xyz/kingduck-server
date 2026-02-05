@@ -3,6 +3,7 @@ import { CharacterScraper as StarRailCharacterScraper } from './scrapers/starrai
 import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrail/LightConeScraper';
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
 import { StarRailItemScraper } from './scrapers/starrail/ItemScraper';
+import { EventScraper as StarRailEventScraper } from './scrapers/starrail/EventScraper';
 import { YoutubeShortsScraper } from './scrapers/starrail/YoutubeShortsScraper';
 import { YoutubeShortsScraper as Reverse1999YoutubeShortsScraper } from './scrapers/reverse1999/YoutubeShortsScraper';
 import { Reverse1999CharacterScraper } from './scrapers/reverse1999/CharacterScraper';
@@ -97,6 +98,17 @@ async function runCrawlers() {
       type: 'item', // General Items
       run: async (s) => {
         const scraper = new StarRailItemScraper();
+        const data = await scraper.scrape();
+        if (data.length > 0) {
+          await scraper.save(data);
+        }
+      },
+    },
+    {
+      game: 'starrail',
+      type: 'event',
+      run: async (s) => {
+        const scraper = new StarRailEventScraper();
         const data = await scraper.scrape();
         if (data.length > 0) {
           await scraper.save(data);
