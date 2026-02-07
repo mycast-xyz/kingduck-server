@@ -20,6 +20,7 @@ model Game {
   items      Item[]
   videos     Video[]
   calendarEvents CalendarEvent[]
+  redeemGroups   RedeemGroup[]
 
   @@map("games")
 }
@@ -163,4 +164,39 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model RedeemGroup {
+  id           Int          @id @default(autoincrement())
+  gameId       Int          @map("game_id")
+  game         Game         @relation(fields: [gameId], references: [id])
+
+  title        String       // 예: "2월 6일 4.0 버전 공식 방송 리딤코드"
+  
+  // --- 시간 관련 데이터 분리 ---
+  periodText   String?      @map("period_text") // UI 표시용 원문: "입력 기한: 2월 8일 00:59까지"
+  startTime    DateTime     @default(now()) @map("start_time") // 보급 시작 시간
+  endTime      DateTime?    @map("end_time") // 실제 시스템 만료 시간 (이 시간이 지나면 DB 쿼리에서 제외)
+  
+  codes        RedeemCode[] // 1:N 관계
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@index([gameId])
+  @@index([endTime]) // 만료 시간 기준 정렬/필터링 최적화
+  @@map("redeem_groups")
+}
+
+model RedeemCode {
+  id           Int          @id @default(autoincrement())
+  groupId      Int          @map("group_id")
+  group        RedeemGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  code         String       @unique
+  reward       String?      // 보상 내용 (예: 성옥 300개)
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+  
+  @@map("redeem_codes")
 }

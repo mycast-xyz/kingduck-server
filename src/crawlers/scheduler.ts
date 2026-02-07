@@ -4,6 +4,7 @@ import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrai
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
 import { StarRailItemScraper } from './scrapers/starrail/ItemScraper';
 import { EventScraper as StarRailEventScraper } from './scrapers/starrail/EventScraper';
+import { RedeemCodeScraper as StarRailRedeemCodeScraper } from './scrapers/starrail/RedeemCodeScraper';
 import { YoutubeShortsScraper } from './scrapers/starrail/YoutubeShortsScraper';
 import { YoutubeShortsScraper as Reverse1999YoutubeShortsScraper } from './scrapers/reverse1999/YoutubeShortsScraper';
 import { Reverse1999CharacterScraper } from './scrapers/reverse1999/CharacterScraper';
@@ -11,6 +12,7 @@ import { WutheringWavesCharacterScraper } from './scrapers/wutheringwaves/Charac
 import { WutheringWavesWeaponScraper } from './scrapers/wutheringwaves/WeaponScraper';
 import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper';
 import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
+import { RedeemCodeScraper as WutheringWavesRedeemCodeScraper } from './scrapers/wutheringwaves/RedeemCodeScraper';
 import { YoutubeShortsScraper as WutheringWavesYoutubeShortsScraper } from './scrapers/wutheringwaves/YoutubeShortsScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { DataSyncService } from './services/DataSyncService';
@@ -117,6 +119,21 @@ async function runCrawlers() {
     },
     {
       game: 'starrail',
+      type: 'redeem',
+      run: async (s) => {
+        // Pass the shared prisma instance available via import in the scraper file itself
+        // OR instantiate a new client if required by constructor.
+        // The current RedeemerCodeScraper takes prisma in constructor.
+        // We should probably export prisma from utils/prisma or just use the one in scraper?
+        // Wait, scheduler doesn't have direct access to prisma instance easily unless we import it.
+        // Let's import prisma from utils.
+        const { prisma } = require('../utils/prisma');
+        const scraper = new StarRailRedeemCodeScraper(prisma);
+        await scraper.scrape();
+      },
+    },
+    {
+      game: 'starrail',
       type: 'video',
       run: async (s) => {
         const scraper = new YoutubeShortsScraper();
@@ -180,6 +197,15 @@ async function runCrawlers() {
         const scraper = new WutheringWavesItemScraper();
         const data = await scraper.scrape();
         if (data.length > 0) await s.syncItems('wutheringwaves', data);
+      },
+    },
+    {
+      game: 'wutheringwaves',
+      type: 'redeem',
+      run: async (s) => {
+        const { prisma } = require('../utils/prisma');
+        const scraper = new WutheringWavesRedeemCodeScraper(prisma);
+        await scraper.scrape();
       },
     },
     {

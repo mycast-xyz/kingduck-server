@@ -6,6 +6,8 @@ import element from './element/router';
 import account from './account/router';
 import admin from './admin/router';
 import video from './video/router';
+import redeem from './redeem/router';
+import event from './event/router';
 
 const routes = Router();
 
@@ -17,5 +19,7 @@ routes.use('/api/v0/element/', element);
 routes.use('/api/v0/account/', account);
 routes.use('/api/v0/admin/', admin);
 routes.use('/api/v0/video/', video);
+routes.use('/api/v0/redeem/', redeem);
+routes.use('/api/v0/event/', event);
 
 export default routes;
