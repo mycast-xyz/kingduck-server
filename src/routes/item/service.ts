@@ -44,3 +44,15 @@ export const getItemList = async (originalId?: string, gameId?: number) => {
     },
   });
 };
+
+export const getItemByName = async (gameSlug: string, name: string) => {
+  return await prisma.item.findFirst({
+    where: {
+      game: { slug: gameSlug },
+      name: { equals: name, mode: 'insensitive' },
+    },
+    include: {
+      game: true,
+    },
+  });
+};

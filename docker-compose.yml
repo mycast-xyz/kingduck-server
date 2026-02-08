@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      # - DATABASE_URL=postgresql://user:password@db:5432/mydb # 예시: 실제 DB 연결 정보로 변경 필요
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./data:/usr/src/app/data # 데이터 영속성을 위해 마운트 (선택 사항)

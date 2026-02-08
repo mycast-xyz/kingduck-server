@@ -18,3 +18,11 @@ export const getEvents = async (gameSlug: string) => {
 
   return events;
 };
+
+export const getEventById = async (id: number) => {
+  const event = await prisma.calendarEvent.findUnique({
+    where: { id },
+  });
+
+  return event;
+};

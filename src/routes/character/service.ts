@@ -74,3 +74,18 @@ export const getElementList = async (gameSlug: string) => {
     orderBy: { id: 'asc' },
   });
 };
+
+export const getCharacterByName = async (gameSlug: string, name: string) => {
+  return await prisma.character.findFirst({
+    where: {
+      game: { slug: gameSlug },
+      name: { equals: name, mode: 'insensitive' },
+    },
+    include: {
+      game: true,
+      element: true,
+      path: true,
+      videos: true,
+    },
+  });
+};

@@ -72,24 +72,40 @@ export class AccountController {
    * 이메일 중복 체크 메서드
    */
   async AccountCheckEmail(req: any, res: any): Promise<void> {
-    const { email } = req.body;
+    try {
+      const { email } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+      if (!email) {
+        return res.status(400).json({
+          resultCode: 400,
+          item: 'email',
+          resultMsg: '이메일을 입력해주세요.',
+        });
+      }
 
-    if (user) {
-      return res.status(400).json({
-        resultCode: 400,
-        item: 'email',
-        resultMsg: '이미 존재하는 이메일입니다.',
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      if (user) {
+        return res.status(400).json({
+          resultCode: 400,
+          item: 'email',
+          resultMsg: '이미 존재하는 이메일입니다.',
+        });
+      }
+
+      // 성공 응답 반환
+      return res.status(200).json({
+        resultCode: 200,
+        item: 'ok',
+        resultMsg: '사용 가능한 이메일입니다.',
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        resultCode: 500,
+        resultMsg: '서버 오류가 발생했습니다.',
       });
     }
-
-    // 성공 응답 반환
-    return res.status(200).json({
-      resultCode: 200,
-      item: 'ok',
-      resultMsg: '사용 가능한 이메일입니다.',
-    });
   }
 }
 

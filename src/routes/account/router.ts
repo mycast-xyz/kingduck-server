@@ -4,7 +4,7 @@ import express from 'express';
 import AccountController from './AccountController';
 import LoginController from './LoginController';
 
-import { registerValidator, loginValidator } from './validator';
+import { registerValidator, loginValidator, emailValidator } from './validator';
 
 const router = express.Router();
 
@@ -16,7 +16,11 @@ router.post(
   registerValidator,
   AccountController.AccountCreateAll,
 );
-router.post('/validate/email', AccountController.AccountCheckEmail);
+router.post(
+  '/validate/email',
+  emailValidator,
+  AccountController.AccountCheckEmail,
+);
 router.post('/login', loginValidator, LoginController.Login);
 
 export default router;

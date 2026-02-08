@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import * as controller from './controller';
+import {
+  getList,
+  getDetail,
+  getCharacterDetailByName,
+  getDetailByOriginalId,
+} from './controller';
 
 const router = Router();
 
@@ -51,7 +56,7 @@ const router = Router();
  *       200:
  *         description: 캐릭터 리스트 반환 성공
  */
-router.get('/:gameSlug/list', controller.getList);
+router.get('/:gameSlug/list', getList);
 
 /**
  * @swagger
@@ -78,7 +83,33 @@ router.get('/:gameSlug/list', controller.getList);
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/:gameSlug/:id', controller.getDetail);
+router.get('/:gameSlug/:id', getDetail);
+/**
+ * @swagger
+ * /api/v0/character/{gameSlug}/name/{name}:
+ *   get:
+ *     summary: 캐릭터 상세 조회 (이름)
+ *     tags: [Character]
+ *     parameters:
+ *       - in: path
+ *         name: gameSlug
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: string (게임 슬러그)
+ *       - in: path
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: string (캐릭터 이름)
+ *     responses:
+ *       200:
+ *         description: 캐릭터 상세 정보 반환 성공
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ */
+router.get('/:gameSlug/name/:name', getCharacterDetailByName);
 
 /**
  * @swagger
@@ -105,6 +136,6 @@ router.get('/:gameSlug/:id', controller.getDetail);
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/:gameId/original/:originalId', controller.getDetailByOriginalId);
+router.get('/:gameId/original/:originalId', getDetailByOriginalId);
 
 export default router;

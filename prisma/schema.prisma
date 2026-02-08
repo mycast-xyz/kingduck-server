@@ -15,52 +15,92 @@ model Game {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  elements   Element[]
-  characters Character[]
-  items      Item[]
-  videos     Video[]
+  elements       Element[]
+  characters     Character[]
+  items          Item[]
+  videos         Video[]
   calendarEvents CalendarEvent[]
   redeemGroups   RedeemGroup[]
+  crawlerLogs    CrawlerLog[]
 
   @@map("games")
 }
 
 enum EventType {
-  GACHA        // 캐릭터/무기 픽업
-  EVENT        // 인게임 이벤트
-  MAINTENANCE  // 업데이트 및 점검
-  SPECIAL      // 방송, 오프라인 행사
+  GACHA // 캐릭터/무기 픽업
+  EVENT // 인게임 이벤트
+  MAINTENANCE // 업데이트 및 점검
+  SPECIAL // 방송, 오프라인 행사
+}
+
+enum EventStatus {
+  PENDING // 승인 대기
+  APPROVED // 승인됨
+  REJECTED // 거부됨
+  PUBLISHED // 퍼블리시됨
+}
+
+enum CrawlerStatus {
+  RUNNING // 실행 중
+  SUCCESS // 성공
+  FAILED // 실패
+  PARTIAL // 부분 성공
 }
 
 model CalendarEvent {
-  id           Int       @id @default(autoincrement())
-  gameId       Int       @map("game_id")
-  type         EventType
-  title        String
-  startTime    DateTime
-  endTime      DateTime?
-  
-  imageUrl     String?   @map("image_url")
-  officialLink String?   @map("official_link")
-  
-  targetId     String?   @map("target_id")
-  metadata     Json?     
-  
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id        Int       @id @default(autoincrement())
+  gameId    Int       @map("game_id")
+  type      EventType
+  title     String
+  startTime DateTime
+  endTime   DateTime?
 
-  game         Game      @relation(fields: [gameId], references: [id])
+  imageUrl     String? @map("image_url")
+  officialLink String? @map("official_link")
 
-  @@map("calendar_events")
+  targetId String? @map("target_id")
+  metadata Json?
+
+  status     EventStatus @default(PENDING)
+  reviewedBy Int?        @map("reviewed_by")
+  reviewedAt DateTime?   @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  game     Game  @relation(fields: [gameId], references: [id])
+  reviewer User? @relation(fields: [reviewedBy], references: [id])
+
   @@index([gameId, startTime])
   @@index([type])
+  @@index([status])
+  @@map("calendar_events")
+}
+
+model CrawlerLog {
+  id          Int           @id @default(autoincrement())
+  gameId      Int           @map("game_id")
+  crawlerType String        @map("crawler_type") // 'event', 'character', 'video' 등
+  status      CrawlerStatus
+  startTime   DateTime      @map("start_time")
+  endTime     DateTime?     @map("end_time")
+  itemsFound  Int?          @map("items_found")
+  errorMsg    String?       @map("error_msg") @db.Text
+  metadata    Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  game Game @relation(fields: [gameId], references: [id])
+
+  @@index([gameId, crawlerType, startTime])
+  @@map("crawler_logs")
 }
 
 model Element {
   id        Int      @id @default(autoincrement())
   gameId    Int      @map("game_id")
-  name      String   // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt"
-  type      String   // "DamageType" 또는 "Path"
+  name      String // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt"
+  type      String // "DamageType" 또는 "Path"
   iconUrl   String?  @map("icon_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -69,9 +109,9 @@ model Element {
   charactersElement Character[] @relation("CharacterElement")
   charactersPath    Character[] @relation("CharacterPath")
 
-  @@map("elements")
   @@index([gameId])
   @@index([gameId, type])
+  @@map("elements")
 }
 
 model Character {
@@ -80,7 +120,7 @@ model Character {
   elementId  Int?    @map("element_id")
   pathId     Int?    @map("path_id")
   name       String
-  rarity     Int?    // 예: 4, 5
+  rarity     Int? // 예: 4, 5
   weaponType String? // 예: "Sword", "AR", "Rectifier" (Generic weapon type)
   role       String? // 예: "DPS", "Support", "Defender"
   originalId String? @map("original_id")
@@ -99,10 +139,10 @@ model Character {
   path    Element? @relation("CharacterPath", fields: [pathId], references: [id])
   videos  Video[]
 
-  @@map("characters")
   @@index([gameId])
   @@index([elementId])
   @@index([pathId])
+  @@map("characters")
 }
 
 model Item {
@@ -123,8 +163,8 @@ model Item {
 
   game Game @relation(fields: [gameId], references: [id])
 
-  @@map("items")
   @@index([gameId])
+  @@map("items")
 }
 
 model Video {
@@ -135,16 +175,16 @@ model Video {
   url          String   @unique
   thumbnailUrl String?  @map("thumbnail_url")
   localPath    String?  @map("local_path") // e.g., "assets/video/starrail/9Z9twPFh9iU.webm"
-  type         String   // e.g., "KeyVisual", "Trailer", "Shorts"
+  type         String // e.g., "KeyVisual", "Trailer", "Shorts"
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   game      Game       @relation(fields: [gameId], references: [id])
   character Character? @relation(fields: [characterId], references: [id])
 
-  @@map("videos")
   @@index([gameId])
   @@index([characterId])
+  @@map("videos")
 }
 
 enum Role {
@@ -154,34 +194,54 @@ enum Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String
-  uuid      String   @unique
-  role      Role     @default(USER)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  password       String
+  name           String
+  uuid           String          @unique
+  role           Role            @default(USER)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  calendarEvents CalendarEvent[]
+
+  permissions    Json?           // 세부 권한 (예: { "games": { "endfield": ["read", "write"] } })
+  activityLogs   UserActivityLog[]
 
   @@map("users")
 }
 
-model RedeemGroup {
-  id           Int          @id @default(autoincrement())
-  gameId       Int          @map("game_id")
-  game         Game         @relation(fields: [gameId], references: [id])
+model UserActivityLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  action    String   // 예: "LOGIN", "UPDATE_ROLE", "CRAWLER_RUN"
+  details   Json?    // 상세 내용 (변경 전후 값 등)
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  title        String       // 예: "2월 6일 4.0 버전 공식 방송 리딤코드"
-  
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("user_activity_logs")
+}
+
+model RedeemGroup {
+  id     Int  @id @default(autoincrement())
+  gameId Int  @map("game_id")
+  game   Game @relation(fields: [gameId], references: [id])
+
+  title String // 예: "2월 6일 4.0 버전 공식 방송 리딤코드"
+
   // --- 시간 관련 데이터 분리 ---
-  periodText   String?      @map("period_text") // UI 표시용 원문: "입력 기한: 2월 8일 00:59까지"
-  startTime    DateTime     @default(now()) @map("start_time") // 보급 시작 시간
-  endTime      DateTime?    @map("end_time") // 실제 시스템 만료 시간 (이 시간이 지나면 DB 쿼리에서 제외)
-  
-  codes        RedeemCode[] // 1:N 관계
-  
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  periodText String?   @map("period_text") // UI 표시용 원문: "입력 기한: 2월 8일 00:59까지"
+  startTime  DateTime  @default(now()) @map("start_time") // 보급 시작 시간
+  endTime    DateTime? @map("end_time") // 실제 시스템 만료 시간 (이 시간이 지나면 DB 쿼리에서 제외)
+
+  codes RedeemCode[] // 1:N 관계
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([gameId])
   @@index([endTime]) // 만료 시간 기준 정렬/필터링 최적화
@@ -189,14 +249,14 @@ model RedeemGroup {
 }
 
 model RedeemCode {
-  id           Int          @id @default(autoincrement())
-  groupId      Int          @map("group_id")
-  group        RedeemGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id      Int         @id @default(autoincrement())
+  groupId Int         @map("group_id")
+  group   RedeemGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  code         String       @unique
-  reward       String?      // 보상 내용 (예: 성옥 300개)
-  
-  createdAt    DateTime     @default(now()) @map("created_at")
-  
+  code   String  @unique
+  reward String? // 보상 내용 (예: 성옥 300개)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@map("redeem_codes")
 }

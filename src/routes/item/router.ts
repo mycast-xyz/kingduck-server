@@ -26,4 +26,31 @@ const router = Router();
  */
 router.get('/list', controller.getList);
 
+/**
+ * @swagger
+ * /api/v0/item/{gameSlug}/name/{name}:
+ *   get:
+ *     summary: 아이템 상세 조회 (이름)
+ *     tags: [Item]
+ *     parameters:
+ *       - in: path
+ *         name: gameSlug
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: string (게임 슬러그)
+ *       - in: path
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: string (아이템 이름)
+ *     responses:
+ *       200:
+ *         description: 아이템 상세 정보 반환 성공
+ *       404:
+ *         description: 아이템을 찾을 수 없음
+ */
+router.get('/:gameSlug/name/:name', controller.getItemByName);
+
 export default router;

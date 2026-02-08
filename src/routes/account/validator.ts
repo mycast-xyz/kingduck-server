@@ -40,6 +40,15 @@ export const registerValidator = [
   validate,
 ];
 
+export const emailValidator = [
+  body('email')
+    .isEmail()
+    .withMessage('이메일 형식이 아닙니다.')
+    .notEmpty()
+    .withMessage('이메일을 입력해주세요.'),
+  validate,
+];
+
 // Login Validator (Optional, but good practice)
 export const loginValidator = [
   body('email').isEmail().withMessage('이메일 형식이 아닙니다.'),

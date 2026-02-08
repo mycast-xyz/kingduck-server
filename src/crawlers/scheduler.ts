@@ -14,17 +14,255 @@ import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper
 import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
 import { RedeemCodeScraper as WutheringWavesRedeemCodeScraper } from './scrapers/wutheringwaves/RedeemCodeScraper';
 import { YoutubeShortsScraper as WutheringWavesYoutubeShortsScraper } from './scrapers/wutheringwaves/YoutubeShortsScraper';
+import { EndfieldCharacterScraper } from './scrapers/endfield/CharacterScraper';
+import { EndfieldWeaponScraper } from './scrapers/endfield/WeaponScraper';
+import { EndfieldEquipmentScraper } from './scrapers/endfield/EquipmentScraper';
+import { EndfieldItemScraper } from './scrapers/endfield/ItemScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
+import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
+import { prisma } from '../utils/prisma';
+import { CrawlerStatus } from '@prisma/client';
 
 // Type definition for scraper task
-type ScraperTask = {
+export type ScraperTask = {
   game: string;
   type: string; // 'character', 'item', 'weapon', 'echo', 'video', etc.
-  run: (syncService: DataSyncService) => Promise<void>;
+  run: (syncService: DataSyncService) => Promise<number>;
 };
+
+// Define all tasks
+export const CRAWLER_TASKS: ScraperTask[] = [
+  // --- Genshin Impact ---
+  // {
+  //   game: 'genshin',
+  //   type: 'character',
+  //   run: async (s) => {
+  //     const scraper = new GenshinCharacterScraper('genshin');
+  //     const data = await scraper.scrape();
+  //     if (data.length > 0) await s.syncCharacters('genshin', data);
+  //   },
+  // },
+
+  // --- Honkai: Star Rail ---
+  {
+    game: 'starrail',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new StarRailCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('starrail', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'item', // LightCone is technically an item
+    run: async (s) => {
+      const scraper = new StarRailLightConeScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('starrail', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'relic',
+    run: async (s) => {
+      const scraper = new StarRailRelicScraper();
+      const data = await scraper.scrape();
+      return data ? data.length : 0;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'item', // General Items
+    run: async (s) => {
+      const scraper = new StarRailItemScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'event',
+    run: async (s) => {
+      const scraper = new StarRailEventScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'redeem',
+    run: async (s) => {
+      const { prisma } = require('../utils/prisma');
+      const scraper = new StarRailRedeemCodeScraper(prisma);
+      const result = await scraper.scrape();
+      return result ? result.codes.length : 0;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new YoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('starrail', data);
+      return data.length;
+    },
+  },
+
+  // --- Reverse: 1999 ---
+  {
+    game: 'reverse1999',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new Reverse1999CharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('reverse1999', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'reverse1999',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new Reverse1999YoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('reverse1999', data);
+      return data.length;
+    },
+  },
+
+  // --- Wuthering Waves ---
+  {
+    game: 'wutheringwaves',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new WutheringWavesCharacterScraper();
+      const data = await scraper.scrape({});
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    type: 'weapon',
+    run: async (s) => {
+      const scraper = new WutheringWavesWeaponScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    type: 'echo',
+    run: async (s) => {
+      const scraper = new WutheringWavesEchoScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    type: 'item',
+    run: async (s) => {
+      const scraper = new WutheringWavesItemScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('wutheringwaves', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    type: 'redeem',
+    run: async (s) => {
+      const { prisma } = require('../utils/prisma');
+      const scraper = new WutheringWavesRedeemCodeScraper(prisma);
+      const result = await scraper.scrape();
+      return result ? result.codes.length : 0;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new WutheringWavesYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('wutheringwaves', data);
+      return data.length;
+    },
+  },
+
+  // --- Arknights: Endfield ---
+  {
+    game: 'endfield',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new EndfieldCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('endfield', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'endfield',
+    type: 'weapon',
+    run: async (s) => {
+      const scraper = new EndfieldWeaponScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'endfield',
+    type: 'equipment',
+    run: async (s) => {
+      const scraper = new EndfieldEquipmentScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'endfield',
+    type: 'item',
+    run: async (s) => {
+      const scraper = new EndfieldItemScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('endfield', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'endfield',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new EndfieldYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('endfield', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'endfield',
+    type: 'event',
+    run: async (s) => {
+      const scraper = new EndfieldEventScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+];
 
 async function runCrawlers() {
   logger.info('=== Crawler Job Started ===');
@@ -53,193 +291,66 @@ async function runCrawlers() {
 
   const syncService = new DataSyncService();
 
-  // Define all tasks
-  const tasks: ScraperTask[] = [
-    // --- Genshin Impact ---
-    // {
-    //   game: 'genshin',
-    //   type: 'character',
-    //   run: async (s) => {
-    //     const scraper = new GenshinCharacterScraper('genshin');
-    //     const data = await scraper.scrape();
-    //     if (data.length > 0) await s.syncCharacters('genshin', data);
-    //   },
-    // },
-
-    // --- Honkai: Star Rail ---
-    {
-      game: 'starrail',
-      type: 'character',
-      run: async (s) => {
-        const scraper = new StarRailCharacterScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncCharacters('starrail', data);
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'item', // LightCone is technically an item
-      run: async (s) => {
-        const scraper = new StarRailLightConeScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncItems('starrail', data);
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'relic',
-      run: async (s) => {
-        const scraper = new StarRailRelicScraper();
-        await scraper.scrape();
-        // Item sync logic for relics is pending or inside scraper?
-        // Original code had no sync call for relics
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'item', // General Items
-      run: async (s) => {
-        const scraper = new StarRailItemScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) {
-          await scraper.save(data);
-        }
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'event',
-      run: async (s) => {
-        const scraper = new StarRailEventScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) {
-          await scraper.save(data);
-        }
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'redeem',
-      run: async (s) => {
-        // Pass the shared prisma instance available via import in the scraper file itself
-        // OR instantiate a new client if required by constructor.
-        // The current RedeemerCodeScraper takes prisma in constructor.
-        // We should probably export prisma from utils/prisma or just use the one in scraper?
-        // Wait, scheduler doesn't have direct access to prisma instance easily unless we import it.
-        // Let's import prisma from utils.
-        const { prisma } = require('../utils/prisma');
-        const scraper = new StarRailRedeemCodeScraper(prisma);
-        await scraper.scrape();
-      },
-    },
-    {
-      game: 'starrail',
-      type: 'video',
-      run: async (s) => {
-        const scraper = new YoutubeShortsScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncVideos('starrail', data);
-      },
-    },
-
-    // --- Reverse: 1999 ---
-    {
-      game: 'reverse1999',
-      type: 'character',
-      run: async (s) => {
-        const scraper = new Reverse1999CharacterScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncCharacters('reverse1999', data);
-      },
-    },
-    {
-      game: 'reverse1999',
-      type: 'video',
-      run: async (s) => {
-        const scraper = new Reverse1999YoutubeShortsScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncVideos('reverse1999', data);
-      },
-    },
-
-    // --- Wuthering Waves ---
-    {
-      game: 'wutheringwaves',
-      type: 'character',
-      run: async (s) => {
-        const scraper = new WutheringWavesCharacterScraper();
-        const data = await scraper.scrape({});
-        if (data.length > 0) await scraper.save(data);
-      },
-    },
-    {
-      game: 'wutheringwaves',
-      type: 'weapon',
-      run: async (s) => {
-        const scraper = new WutheringWavesWeaponScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await scraper.save(data);
-      },
-    },
-    {
-      game: 'wutheringwaves',
-      type: 'echo',
-      run: async (s) => {
-        const scraper = new WutheringWavesEchoScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await scraper.save(data);
-      },
-    },
-    {
-      game: 'wutheringwaves',
-      type: 'item',
-      run: async (s) => {
-        const scraper = new WutheringWavesItemScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncItems('wutheringwaves', data);
-      },
-    },
-    {
-      game: 'wutheringwaves',
-      type: 'redeem',
-      run: async (s) => {
-        const { prisma } = require('../utils/prisma');
-        const scraper = new WutheringWavesRedeemCodeScraper(prisma);
-        await scraper.scrape();
-      },
-    },
-    {
-      game: 'wutheringwaves',
-      type: 'video',
-      run: async (s) => {
-        const scraper = new WutheringWavesYoutubeShortsScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncVideos('wutheringwaves', data);
-      },
-    },
-    {
-      game: 'endfield',
-      type: 'video',
-      run: async (s) => {
-        const scraper = new EndfieldYoutubeShortsScraper();
-        const data = await scraper.scrape();
-        if (data.length > 0) await s.syncVideos('endfield', data);
-      },
-    },
-  ];
-
   // Execute tasks
   let taskCount = 0;
-  for (const task of tasks) {
+  for (const task of CRAWLER_TASKS) {
     if (gameFilter && task.game !== gameFilter) continue;
     if (typeFilter && task.type !== typeFilter) continue;
 
     logger.info(`>>> Running task: [${task.game}] ${task.type}`);
     try {
-      await task.run(syncService);
-      taskCount++;
+      // Find game ID for logging
+      const game = await prisma.game.findUnique({
+        where: { slug: task.game },
+      });
+
+      if (!game) {
+        logger.error(`Game not found for task: ${task.game}`);
+        continue;
+      }
+
+      // Create log entry (RUNNING)
+      const crawlerLog = await prisma.crawlerLog.create({
+        data: {
+          gameId: game.id,
+          crawlerType: task.type,
+          status: CrawlerStatus.RUNNING,
+          startTime: new Date(),
+        },
+      });
+
+      try {
+        const itemsFound = await task.run(syncService);
+
+        // Update log entry (SUCCESS)
+        await prisma.crawlerLog.update({
+          where: { id: crawlerLog.id },
+          data: {
+            status: CrawlerStatus.SUCCESS,
+            endTime: new Date(),
+            itemsFound: itemsFound || 0,
+          },
+        });
+
+        taskCount++;
+      } catch (innerError) {
+        logger.error(`Task [${task.game}] ${task.type} failed:`, innerError);
+
+        // Update log entry (FAILED)
+        await prisma.crawlerLog.update({
+          where: { id: crawlerLog.id },
+          data: {
+            status: CrawlerStatus.FAILED,
+            endTime: new Date(),
+            errorMsg:
+              innerError instanceof Error
+                ? innerError.message
+                : String(innerError),
+          },
+        });
+      }
     } catch (e) {
-      logger.error(`Task [${task.game}] ${task.type} failed:`, e);
+      logger.error(`Failed to handle log/task [${task.game}] ${task.type}:`, e);
     }
   }
 
