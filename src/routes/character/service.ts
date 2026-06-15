@@ -7,13 +7,18 @@ interface CharacterFilter {
   pathId?: number;
 }
 
+const withOriginalId = <T extends { originalId?: string | null; metadata?: unknown }>(c: T) => ({
+  ...c,
+  originalId: (c.originalId ?? (c.metadata as any)?.originalId) as string | undefined,
+});
+
 export const getCharacterList = async (
   gameSlug: string,
   filter?: CharacterFilter,
 ) => {
   const { name, elementId, rarity, pathId } = filter || {};
 
-  return await prisma.character.findMany({
+  const results = await prisma.character.findMany({
     where: {
       game: { slug: gameSlug },
       ...(name && { name: { contains: name, mode: 'insensitive' } }),
@@ -28,10 +33,11 @@ export const getCharacterList = async (
       path: true,
     },
   });
+  return results.map(withOriginalId);
 };
 
 export const getCharacter = async (gameSlug: string, id: number) => {
-  return await prisma.character.findFirst({
+  const result = await prisma.character.findFirst({
     where: {
       id,
       game: { slug: gameSlug },
@@ -43,13 +49,14 @@ export const getCharacter = async (gameSlug: string, id: number) => {
       videos: true,
     },
   });
+  return result ? withOriginalId(result) : result;
 };
 
 export const getCharacterByOriginalId = async (
   gameId: number,
   originalId: string,
 ) => {
-  return await prisma.character.findFirst({
+  const result = await prisma.character.findFirst({
     where: {
       gameId,
       metadata: {
@@ -64,6 +71,7 @@ export const getCharacterByOriginalId = async (
       videos: true,
     },
   });
+  return result ? withOriginalId(result) : result;
 };
 
 export const getElementList = async (gameSlug: string) => {
@@ -76,7 +84,7 @@ export const getElementList = async (gameSlug: string) => {
 };
 
 export const getCharacterAdmin = async (id: number) => {
-  return await prisma.character.findUnique({
+  const result = await prisma.character.findUnique({
     where: { id },
     include: {
       game: true,
@@ -85,10 +93,11 @@ export const getCharacterAdmin = async (id: number) => {
       videos: true,
     },
   });
+  return result ? withOriginalId(result) : result;
 };
 
 export const getCharacterByName = async (gameSlug: string, name: string) => {
-  return await prisma.character.findFirst({
+  const result = await prisma.character.findFirst({
     where: {
       game: { slug: gameSlug },
       name: { equals: name, mode: 'insensitive' },
@@ -100,4 +109,5 @@ export const getCharacterByName = async (gameSlug: string, name: string) => {
       videos: true,
     },
   });
+  return result ? withOriginalId(result) : result;
 };

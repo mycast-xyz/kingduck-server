@@ -1,5 +1,10 @@
 import { prisma } from '../../utils/prisma';
 
+const withOriginalId = <T extends { metadata?: unknown }>(i: T) => ({
+  ...i,
+  originalId: (i.metadata as any)?.originalId as string | undefined,
+});
+
 export const getItemList = async (originalId?: string, gameId?: number) => {
   const where: any = {};
 
@@ -36,17 +41,18 @@ export const getItemList = async (originalId?: string, gameId?: number) => {
     }
   }
 
-  return await prisma.item.findMany({
+  const results = await prisma.item.findMany({
     where,
     orderBy: { id: 'asc' },
     include: {
       game: true,
     },
   });
+  return results.map(withOriginalId);
 };
 
 export const getItemByName = async (gameSlug: string, name: string) => {
-  return await prisma.item.findFirst({
+  const result = await prisma.item.findFirst({
     where: {
       game: { slug: gameSlug },
       name: { equals: name, mode: 'insensitive' },
@@ -55,4 +61,5 @@ export const getItemByName = async (gameSlug: string, name: string) => {
       game: true,
     },
   });
+  return result ? withOriginalId(result) : result;
 };
