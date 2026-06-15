@@ -31,6 +31,7 @@ export class EventScraper extends ScraperBase {
 
     try {
       const response = await axios.get(this.API_URL, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -95,6 +96,7 @@ export class EventScraper extends ScraperBase {
       await this.delay(200);
       const detailUrl = `https://bbs-api-os.hoyolab.com/community/post/wapi/getPostFull?post_id=${postId}`;
       const detailRes = await axios.get(detailUrl, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -131,6 +133,7 @@ export class EventScraper extends ScraperBase {
       await this.delay(200);
       const detailUrl = `https://bbs-api-os.hoyolab.com/community/post/wapi/getPostFull?post_id=${post.post_id}`;
       const detailRes = await axios.get(detailUrl, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

@@ -54,7 +54,7 @@ export class WutheringWavesEchoScraper extends ScraperBase {
       }
       const gameId = game.id;
 
-      const { data } = await axios.get(`${BASE_API_URL}/echo`);
+      const { data } = await axios.get(`${BASE_API_URL}/echo`, { timeout: 15000 });
       const list = data.Echo || [];
       const results: ScrapedData[] = [];
 
@@ -62,7 +62,7 @@ export class WutheringWavesEchoScraper extends ScraperBase {
         const detailUrl = `${BASE_API_URL}/echo/${item.Id}`;
         let rawDetailData = item;
         try {
-          const { data: detail } = await axios.get(detailUrl);
+          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
           rawDetailData = { ...item, ...detail };
         } catch (err) {
           logger.warn(`Failed to fetch detail for echo ${item.Id}:`, err);

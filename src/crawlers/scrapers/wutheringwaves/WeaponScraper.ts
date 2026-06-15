@@ -57,7 +57,7 @@ export class WutheringWavesWeaponScraper extends ScraperBase {
       }
       const gameId = game.id;
 
-      const { data } = await axios.get(`${BASE_API_URL}/weapon`);
+      const { data } = await axios.get(`${BASE_API_URL}/weapon`, { timeout: 15000 });
       const list = data.weapons || [];
       const results: ScrapedData[] = [];
 
@@ -65,7 +65,7 @@ export class WutheringWavesWeaponScraper extends ScraperBase {
         const detailUrl = `${BASE_API_URL}/weapon/${item.Id}`;
         let rawDetailData = item;
         try {
-          const { data: detail } = await axios.get(detailUrl);
+          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
           rawDetailData = { ...item, ...detail };
         } catch (err) {
           logger.warn(`Failed to fetch detail for weapon ${item.Id}:`, err);

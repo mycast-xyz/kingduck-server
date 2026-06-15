@@ -44,7 +44,7 @@ export class EndfieldCharacterScraper extends ScraperBase {
       const urls = Object.values(I18N_URLS);
       const responses = await Promise.all(
         urls.map((url) =>
-          axios.get(url, { headers: HEADERS }).catch((e) => ({ data: {} })),
+          axios.get(url, { headers: HEADERS, timeout: 15000 }).catch((e) => ({ data: {} })),
         ),
       );
 
@@ -169,6 +169,7 @@ export class EndfieldCharacterScraper extends ScraperBase {
       logger.info('Fetching Character List...');
       const { data: listData } = await axios.get(BASE_LIST_URL, {
         headers: HEADERS,
+        timeout: 15000,
       });
       let list = Object.values(listData);
       logger.info(`Found ${list.length} characters.`);
@@ -199,6 +200,7 @@ export class EndfieldCharacterScraper extends ScraperBase {
           const detailUrl = `${BASE_DETAIL_URL}/${charId}.json`;
           const { data: detail } = await axios.get(detailUrl, {
             headers: HEADERS,
+            timeout: 15000,
           });
 
           // Recursive resolve

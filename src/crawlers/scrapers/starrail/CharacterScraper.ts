@@ -21,7 +21,7 @@ export class CharacterScraper extends ScraperBase {
 
     try {
       // 1. Fetch List
-      const { data: charMap } = await axios.get(this.LIST_API_URL);
+      const { data: charMap } = await axios.get(this.LIST_API_URL, { timeout: 15000 });
       // charMap is object { id: { ...basic info } }
       let charIds = Object.keys(charMap);
 
@@ -42,7 +42,7 @@ export class CharacterScraper extends ScraperBase {
         try {
           // 2. Fetch Detail
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
-          const { data: detail } = await axios.get(detailUrl);
+          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
 
           // DEBUG: Save first character JSON
           if (results.length === 0) {

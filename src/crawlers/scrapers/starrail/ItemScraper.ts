@@ -42,7 +42,7 @@ export class StarRailItemScraper extends ScraperBase {
       const gameId = game.id;
 
       // 1. Fetch data
-      const { data: itemMap } = await axios.get(this.API_URL);
+      const { data: itemMap } = await axios.get(this.API_URL, { timeout: 15000 });
 
       // The API returns an object where keys are IDs. Convert to array.
       const list = Object.values(itemMap) as any[];

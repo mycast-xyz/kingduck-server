@@ -23,6 +23,7 @@ export class RelicScraper extends ScraperBase {
     try {
       logger.info('Fetching image mapping from StarRailStation...');
       const { data: html } = await axios.get(this.SRS_URL, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -107,6 +108,7 @@ export class RelicScraper extends ScraperBase {
     try {
       const url = `${this.SRS_URL}/${id}`;
       const { data: html } = await axios.get(url, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -153,7 +155,7 @@ export class RelicScraper extends ScraperBase {
     const srsMapping = await this.fetchSRSMapping();
 
     try {
-      const { data: setMap } = await axios.get(this.LIST_API_URL);
+      const { data: setMap } = await axios.get(this.LIST_API_URL, { timeout: 15000 });
       const setIds = Object.keys(setMap);
       logger.info(`Found ${setIds.length} relic sets from Hakush.in.`);
 
@@ -162,7 +164,7 @@ export class RelicScraper extends ScraperBase {
           // Check if relic set already exists in database
 
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
-          const { data: detail } = await axios.get(detailUrl);
+          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
 
           const name = detail.Name || setMap[id].Name || `RelicSet_${id}`;
           const normalizedName = name.replace(/\s/g, '');

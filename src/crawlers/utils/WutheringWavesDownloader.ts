@@ -104,7 +104,7 @@ export class WutheringWavesDownloader {
         url: fullUrl,
         method: 'GET',
         responseType: 'arraybuffer',
-        timeout: 10000,
+        timeout: 15000,
       });
 
       // 6. Save (Convert if image, Raw if video)

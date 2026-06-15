@@ -19,7 +19,7 @@ export class LightConeScraper extends ScraperBase {
     const results: ScrapedData[] = [];
 
     try {
-      const { data: lcMap } = await axios.get(this.LIST_API_URL);
+      const { data: lcMap } = await axios.get(this.LIST_API_URL, { timeout: 15000 });
       const lcIds = Object.keys(lcMap);
       logger.info(`Found ${lcIds.length} lightcones.`);
 
@@ -41,7 +41,7 @@ export class LightConeScraper extends ScraperBase {
           }
 
           const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
-          const { data: detail } = await axios.get(detailUrl);
+          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
 
           const name =
             detail.Name || lcMap[id].Name || lcMap[id].name || `LC_${id}`;

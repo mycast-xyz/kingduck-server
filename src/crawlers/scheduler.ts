@@ -312,6 +312,22 @@ async function runCrawlers() {
           continue;
         }
 
+        // 중복 실행 방지 — 이미 RUNNING 상태인 크롤러는 스킵
+        const existingRunning = await prisma.crawlerLog.findFirst({
+          where: {
+            gameId: game.id,
+            crawlerType: task.type,
+            status: CrawlerStatus.RUNNING,
+          },
+        });
+
+        if (existingRunning) {
+          logger.warn(
+            `Task [${task.game}] ${task.type} is already running (log ID: ${existingRunning.id}), skipping.`,
+          );
+          continue;
+        }
+
         // Create log entry (RUNNING)
         const crawlerLog = await prisma.crawlerLog.create({
           data: {

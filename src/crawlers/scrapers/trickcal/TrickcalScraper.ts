@@ -28,6 +28,7 @@ export class TrickcalScraper {
       url: this.dbUrl,
       method: 'GET',
       responseType: 'arraybuffer',
+      timeout: 15000,
     });
 
     fs.writeFileSync(this.tempDbPath, Buffer.from(response.data));

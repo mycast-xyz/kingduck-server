@@ -54,7 +54,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
 
       for (const [key, url] of Object.entries(I18N_URLS)) {
         try {
-          const { data: i18nData } = await axios.get(url, { headers: HEADERS });
+          const { data: i18nData } = await axios.get(url, { headers: HEADERS, timeout: 15000 });
           Object.assign(i18nMap, i18nData);
           logger.info(`Loaded ${key} I18n data.`);
         } catch (e) {
@@ -80,6 +80,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
         BASE_EQUIPMENT_SUIT_LIST_URL,
         {
           headers: HEADERS,
+          timeout: 15000,
         },
       );
       let suits = Object.values(suitListData);
@@ -105,6 +106,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
           const suitDetailUrl = `${BASE_EQUIPMENT_SUIT_DETAIL_URL}/${suitId}.json`;
           const { data: suitDetail } = await axios.get(suitDetailUrl, {
             headers: HEADERS,
+            timeout: 15000,
           });
 
           const resolvedSuit = resolveIds(suitDetail, i18nMap);
@@ -165,6 +167,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
               try {
                 const { data: itemDetail } = await axios.get(itemDetailUrl, {
                   headers: HEADERS,
+                  timeout: 15000,
                 });
                 const resolvedItem = resolveIds(itemDetail, i18nMap);
 

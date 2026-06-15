@@ -60,7 +60,7 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
       const gameId = game.id;
 
       // 2. Get List from API
-      const { data } = await axios.get(`${BASE_API_URL}/character`);
+      const { data } = await axios.get(`${BASE_API_URL}/character`, { timeout: 15000 });
       let list = data.roleList || [];
 
       if (options?.limit) {
@@ -85,6 +85,7 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
           // In previous check it was `item.Id`.
           const { data: detailData } = await axios.get(
             `${BASE_API_URL}/character/${item.Id}`,
+            { timeout: 15000 },
           );
 
           if (!detailData) {

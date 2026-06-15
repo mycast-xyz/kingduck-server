@@ -207,7 +207,24 @@ export class CrawlerController {
         return;
       }
 
-      // 3. 실행 (비동기)
+      // 3. 중복 실행 방지 — 이미 RUNNING 상태인 크롤러 거부
+      const runningLog = await prisma.crawlerLog.findFirst({
+        where: {
+          gameId: game.id,
+          crawlerType,
+          status: CrawlerStatus.RUNNING,
+        },
+      });
+
+      if (runningLog) {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '이미 실행 중입니다.',
+        });
+        return;
+      }
+
+      // 4. 실행 (비동기)
       // Browser Init은 싱글톤이라 괜찮음
       const browser = Browser.getInstance();
       await browser.init();
@@ -255,7 +272,7 @@ export class CrawlerController {
           });
         });
 
-      // 4. 즉시 응답 (방금 생성한 로그 정보를 반환)
+      // 5. 즉시 응답 (방금 생성한 로그 정보를 반환)
       res.status(200).json({
         resultCode: 200,
         resultMsg: '크롤러 실행이 시작되었습니다.',

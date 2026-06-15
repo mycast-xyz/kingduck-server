@@ -30,7 +30,7 @@ export class EndfieldWeaponScraper extends ScraperBase {
       // 1. Fetch Localization Maps
       logger.info('Fetching Localization Maps...');
       const mapRequests = Object.values(I18N_URLS).map((url) =>
-        axios.get(url, { headers: HEADERS }),
+        axios.get(url, { headers: HEADERS, timeout: 15000 }),
       );
       const mapResponses = await Promise.all(mapRequests);
       let i18nMap: Record<string, string> = {};
@@ -71,6 +71,7 @@ export class EndfieldWeaponScraper extends ScraperBase {
       logger.info('Fetching Weapon List...');
       const { data: listData } = await axios.get(BASE_WEAPON_LIST_URL, {
         headers: HEADERS,
+        timeout: 15000,
       });
       let list = Object.values(listData);
       logger.info(`Found ${list.length} weapons.`);
@@ -119,6 +120,7 @@ export class EndfieldWeaponScraper extends ScraperBase {
           const detailUrl = `${BASE_WEAPON_DETAIL_URL}/${weaponId}.json`;
           const { data: detail } = await axios.get(detailUrl, {
             headers: HEADERS,
+            timeout: 15000,
           });
 
           // Recursive resolve

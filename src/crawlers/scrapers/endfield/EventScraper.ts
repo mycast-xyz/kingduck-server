@@ -42,6 +42,7 @@ export class EventScraper extends ScraperBase {
     try {
       // Fetch the list of posts
       const listResponse = await axios.get(this.LIST_API_URL, {
+        timeout: 15000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -74,6 +75,7 @@ export class EventScraper extends ScraperBase {
           const detailResponse = await axios.get(
             `${this.DETAIL_API_URL_BASE}${feed.feedId}`,
             {
+              timeout: 15000,
               headers: {
                 'User-Agent':
                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

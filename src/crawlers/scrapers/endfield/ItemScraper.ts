@@ -44,7 +44,7 @@ export class EndfieldItemScraper extends ScraperBase {
 
       for (const [key, url] of Object.entries(I18N_URLS)) {
         try {
-          const { data: i18nData } = await axios.get(url, { headers: HEADERS });
+          const { data: i18nData } = await axios.get(url, { headers: HEADERS, timeout: 15000 });
           Object.assign(i18nMap, i18nData);
           logger.info(`Loaded ${key} I18n data.`);
         } catch (e) {
@@ -68,6 +68,7 @@ export class EndfieldItemScraper extends ScraperBase {
       logger.info('Fetching Item List...');
       const { data: itemListData } = await axios.get(BASE_ITEM_LIST_URL, {
         headers: HEADERS,
+        timeout: 15000,
       });
 
       // The list is an object where keys are IDs
