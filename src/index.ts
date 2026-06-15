@@ -2,6 +2,7 @@ import 'dotenv/config'; // .env 로드(JWT_SECRET_KEY 등) — config 임포트�
 import express, { type ErrorRequestHandler } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import helmet from 'helmet';
 
 // DB ORM 참조
 import { config } from './config/config';
@@ -24,6 +25,13 @@ const whitelist: string[] = [
         .filter(Boolean)
     : []),
 ];
+
+// 보안 헤더: helmet 기본값 적용. CSP는 swagger UI(/api-docs)를 깨뜨릴 수 있어 비활성화.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  }),
+);
 
 // Private Network Access (PNA) 허용 헤더 추가 - CORS 미들웨어보다 먼저 실행
 app.use((req, res, next) => {
