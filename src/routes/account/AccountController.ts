@@ -10,29 +10,26 @@ export class AccountController {
    * 계정 생성 메서드
    */
   async AccountCreateAll(req: any, res: any): Promise<void> {
-    const { email, password, name, passwordChk } = req.body;
-
-    console.log(email, name);
-
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    // 이메일 유효성 검사 - 이메일 중복 (DB check remains as business logic)
-    if (user) {
-      return res.status(400).json({
-        resultCode: 400,
-        item: 'email',
-        resultMsg: '이미 존재하는 이메일입니다.',
-      });
-    }
-
-    const hashEncryptionUtil = new HashEncryptionUtil(15);
-    const hashedPwd = await hashEncryptionUtil.encryptPassword(password);
-
-    const uuid = randomUUID();
-
     try {
-      // 사용자 데이터 생성 실행
-      // 기본 Role은 USER (schema default)
+      const { email, password, name, passwordChk } = req.body;
+
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      // 이메일 유효성 검사 - 이메일 중복 (DB check remains as business logic)
+      if (user) {
+        return res.status(400).json({
+          resultCode: 400,
+          item: 'email',
+          resultMsg: '이미 존재하는 이메일입니다.',
+        });
+      }
+
+      const hashEncryptionUtil = new HashEncryptionUtil(15);
+      const hashedPwd = await hashEncryptionUtil.encryptPassword(password);
+
+      const uuid = randomUUID();
+
+      // 사용자 데이터 생성 실행 (기본 Role은 USER)
       const result = await prisma.user.create({
         data: {
           email,

@@ -289,78 +289,82 @@ async function runCrawlers() {
   const browser = Browser.getInstance();
   await browser.init();
 
-  const syncService = new DataSyncService();
+  // browser.close()를 try/finally로 감싸 크롤 도중 throw가 발생해도
+  // Chromium 좀비 프로세스가 쌓이지 않도록 한다.
+  try {
+    const syncService = new DataSyncService();
 
-  // Execute tasks
-  let taskCount = 0;
-  for (const task of CRAWLER_TASKS) {
-    if (gameFilter && task.game !== gameFilter) continue;
-    if (typeFilter && task.type !== typeFilter) continue;
+    // Execute tasks
+    let taskCount = 0;
+    for (const task of CRAWLER_TASKS) {
+      if (gameFilter && task.game !== gameFilter) continue;
+      if (typeFilter && task.type !== typeFilter) continue;
 
-    logger.info(`>>> Running task: [${task.game}] ${task.type}`);
-    try {
-      // Find game ID for logging
-      const game = await prisma.game.findUnique({
-        where: { slug: task.game },
-      });
-
-      if (!game) {
-        logger.error(`Game not found for task: ${task.game}`);
-        continue;
-      }
-
-      // Create log entry (RUNNING)
-      const crawlerLog = await prisma.crawlerLog.create({
-        data: {
-          gameId: game.id,
-          crawlerType: task.type,
-          status: CrawlerStatus.RUNNING,
-          startTime: new Date(),
-        },
-      });
-
+      logger.info(`>>> Running task: [${task.game}] ${task.type}`);
       try {
-        const itemsFound = await task.run(syncService);
+        // Find game ID for logging
+        const game = await prisma.game.findUnique({
+          where: { slug: task.game },
+        });
 
-        // Update log entry (SUCCESS)
-        await prisma.crawlerLog.update({
-          where: { id: crawlerLog.id },
+        if (!game) {
+          logger.error(`Game not found for task: ${task.game}`);
+          continue;
+        }
+
+        // Create log entry (RUNNING)
+        const crawlerLog = await prisma.crawlerLog.create({
           data: {
-            status: CrawlerStatus.SUCCESS,
-            endTime: new Date(),
-            itemsFound: itemsFound || 0,
+            gameId: game.id,
+            crawlerType: task.type,
+            status: CrawlerStatus.RUNNING,
+            startTime: new Date(),
           },
         });
 
-        taskCount++;
-      } catch (innerError) {
-        logger.error(`Task [${task.game}] ${task.type} failed:`, innerError);
+        try {
+          const itemsFound = await task.run(syncService);
 
-        // Update log entry (FAILED)
-        await prisma.crawlerLog.update({
-          where: { id: crawlerLog.id },
-          data: {
-            status: CrawlerStatus.FAILED,
-            endTime: new Date(),
-            errorMsg:
-              innerError instanceof Error
-                ? innerError.message
-                : String(innerError),
-          },
-        });
+          // Update log entry (SUCCESS)
+          await prisma.crawlerLog.update({
+            where: { id: crawlerLog.id },
+            data: {
+              status: CrawlerStatus.SUCCESS,
+              endTime: new Date(),
+              itemsFound: itemsFound || 0,
+            },
+          });
+
+          taskCount++;
+        } catch (innerError) {
+          logger.error(`Task [${task.game}] ${task.type} failed:`, innerError);
+
+          // Update log entry (FAILED)
+          await prisma.crawlerLog.update({
+            where: { id: crawlerLog.id },
+            data: {
+              status: CrawlerStatus.FAILED,
+              endTime: new Date(),
+              errorMsg:
+                innerError instanceof Error
+                  ? innerError.message
+                  : String(innerError),
+            },
+          });
+        }
+      } catch (e) {
+        logger.error(`Failed to handle log/task [${task.game}] ${task.type}:`, e);
       }
-    } catch (e) {
-      logger.error(`Failed to handle log/task [${task.game}] ${task.type}:`, e);
     }
-  }
 
-  if (taskCount === 0) {
-    logger.warn('No tasks matched the filters or checks.');
+    if (taskCount === 0) {
+      logger.warn('No tasks matched the filters or checks.');
+    }
+  } finally {
+    // 정상 종료든 예외든 반드시 브라우저를 닫는다.
+    await browser.close();
+    logger.info('=== Crawler Job Finished ===');
   }
-
-  // Cleanup
-  await browser.close();
-  logger.info('=== Crawler Job Finished ===');
 }
 
 // Allow running directly
