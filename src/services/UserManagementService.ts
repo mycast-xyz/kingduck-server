@@ -14,6 +14,9 @@ class UserManagementService {
     limit: number = 20,
     filter?: { email?: string; name?: string; role?: string },
   ) {
+    // B-H3: 음수 page → 음수 skip(Prisma 500), limit 과대값 → 메모리 폭증 방지
+    page = Math.max(page, 1);
+    limit = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * limit;
     const where: Prisma.UserWhereInput = {};
 

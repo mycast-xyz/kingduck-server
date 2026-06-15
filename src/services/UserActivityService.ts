@@ -37,6 +37,9 @@ class UserActivityService {
    * @param limit 페이지당 항목 수
    */
   async getLogs(userId?: number, page: number = 1, limit: number = 20) {
+    // B-H3: 음수 page → 음수 skip(Prisma 500), limit 과대값 → 메모리 폭증 방지
+    page = Math.max(page, 1);
+    limit = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * limit;
     const where = userId ? { userId } : {};
 

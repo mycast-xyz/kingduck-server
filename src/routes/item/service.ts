@@ -1,5 +1,9 @@
 import { prisma } from '../../utils/prisma';
 
+// B-H2: 공개 목록 무제한 로드 방지. 게임 1종당 아이템 수는 수백 이하이므로
+// 1000으로 충분하나, 초과 시 조용히 잘림(silent truncation) — gameId 필터를 사용할 것.
+const MAX_LIST = 1000;
+
 const withOriginalId = <T extends { metadata?: unknown }>(i: T) => ({
   ...i,
   originalId: (i.metadata as any)?.originalId as string | undefined,
@@ -44,6 +48,7 @@ export const getItemList = async (originalId?: string, gameId?: number) => {
   const results = await prisma.item.findMany({
     where,
     orderBy: { id: 'asc' },
+    take: MAX_LIST,
     include: {
       game: true,
     },

@@ -3,14 +3,19 @@ import UserManagementService from '../../services/UserManagementService';
 import UserActivityService from '../../services/UserActivityService';
 import logger from '../../utils/logger';
 
+// B-H3: 페이지네이션 입력 클램프 헬퍼
+// ?limit=99999999 (전체 로드) 및 ?page=-5 (음수 skip → Prisma 500) 방지
+const clampPage = (v: number): number => Math.max(v, 1);
+const clampLimit = (v: number): number => Math.min(Math.max(v, 1), 100);
+
 class UserManagementController {
   /**
    * 사용자 목록 조회
    */
   getUsers = async (req: Request, res: Response) => {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 20);
       const email = req.query.email as string | undefined;
       const name = req.query.name as string | undefined;
       const role = req.query.role as string | undefined;
@@ -116,8 +121,8 @@ class UserManagementController {
   getUserLogs = async (req: Request, res: Response) => {
     try {
       const targetUserId = parseInt(String(req.params.userId));
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 20);
 
       const result = await UserActivityService.getLogs(
         targetUserId,
