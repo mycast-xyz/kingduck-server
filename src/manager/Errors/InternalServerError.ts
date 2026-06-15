@@ -4,9 +4,9 @@ export class InternalServerError extends Error {
 
   constructor(message: string, item: string = '') {
     super(message);
-    this.name = 'BadRequest';
+    this.name = 'InternalServerError';
     this.item = item;
-    this.resultCode = 400;
+    this.resultCode = 500;
 
     // 로그 남기기
     console.error(`[InternalServerError] ${new Date().toISOString()}`);

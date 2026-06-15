@@ -13,30 +13,34 @@ export class DataSyncService {
   ): Promise<number | null> {
     if (!name) return null;
 
-    // Try to find existing element
-    const existing = await prisma.element.findFirst({
-      where: {
-        gameId,
-        name: { equals: name, mode: 'insensitive' },
-        type,
-      },
+    // NOTE: 완전한 중복 방지는 @@unique([gameId, name, type]) 제약이 필요합니다 (별도 마이그레이션).
+    // 트랜잭션으로 find→create 경쟁 창을 줄입니다.
+    return await prisma.$transaction(async (tx) => {
+      // Try to find existing element
+      const existing = await tx.element.findFirst({
+        where: {
+          gameId,
+          name: { equals: name, mode: 'insensitive' },
+          type,
+        },
+      });
+
+      if (existing) {
+        return existing.id;
+      }
+
+      // Create new element
+      const newElement = await tx.element.create({
+        data: {
+          gameId,
+          name,
+          type,
+        },
+      });
+
+      logger.info(`Created new ${type}: ${name}`);
+      return newElement.id;
     });
-
-    if (existing) {
-      return existing.id;
-    }
-
-    // Create new element
-    const newElement = await prisma.element.create({
-      data: {
-        gameId,
-        name,
-        type,
-      },
-    });
-
-    logger.info(`Created new ${type}: ${name}`);
-    return newElement.id;
   }
 
   public async syncCharacters(gameSlug: string, data: ScrapedData[]) {

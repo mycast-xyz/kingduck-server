@@ -275,33 +275,12 @@ export class AdminController {
     try {
       const eventId = parseInt(String(req.params.id));
       const { edits } = req.body;
-      const userId = (req as any).user?.id; // auth middleware에서 설정된 user
+      const userId = req.user?.userId; // auth middleware에서 설정된 user (DecodedToken.userId)
 
       if (!eventId) {
         res.status(400).json({
           resultCode: 400,
           resultMsg: 'eventId가 필요합니다.',
-        });
-        return;
-      }
-
-      // 이벤트 존재 확인
-      const event = await prisma.calendarEvent.findUnique({
-        where: { id: eventId },
-      });
-
-      if (!event) {
-        res.status(404).json({
-          resultCode: 404,
-          resultMsg: '이벤트를 찾을 수 없습니다.',
-        });
-        return;
-      }
-
-      if (event.status !== 'PENDING') {
-        res.status(400).json({
-          resultCode: 400,
-          resultMsg: '이미 처리된 이벤트입니다.',
         });
         return;
       }
@@ -322,9 +301,32 @@ export class AdminController {
         if (edits.metadata) updateData.metadata = edits.metadata;
       }
 
-      const updatedEvent = await prisma.calendarEvent.update({
-        where: { id: eventId },
+      // PENDING 상태인 경우에만 원자적으로 업데이트 (동시 승인 시 이중 처리 방지)
+      const result = await prisma.calendarEvent.updateMany({
+        where: { id: eventId, status: 'PENDING' },
         data: updateData,
+      });
+
+      if (result.count === 0) {
+        const existing = await prisma.calendarEvent.findUnique({
+          where: { id: eventId },
+        });
+        if (!existing) {
+          res.status(404).json({
+            resultCode: 404,
+            resultMsg: '이벤트를 찾을 수 없습니다.',
+          });
+        } else {
+          res.status(409).json({
+            resultCode: 409,
+            resultMsg: '이미 처리된 이벤트입니다.',
+          });
+        }
+        return;
+      }
+
+      const updatedEvent = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
       });
 
       res.status(200).json({
@@ -514,7 +516,7 @@ export class AdminController {
     try {
       const eventId = parseInt(String(req.params.id));
       const { reason } = req.body;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.userId; // auth middleware에서 설정된 user (DecodedToken.userId)
 
       if (!eventId) {
         res.status(400).json({
@@ -536,26 +538,31 @@ export class AdminController {
         return;
       }
 
-      if (event.status !== 'PENDING') {
-        res.status(400).json({
-          resultCode: 400,
-          resultMsg: '이미 처리된 이벤트입니다.',
-        });
-        return;
-      }
-
       // 거부 사유를 metadata에 저장
       const metadata = (event.metadata as any) || {};
       metadata.rejectionReason = reason;
 
-      const updatedEvent = await prisma.calendarEvent.update({
-        where: { id: eventId },
+      // PENDING 상태인 경우에만 원자적으로 업데이트 (동시 거부 시 이중 처리 방지)
+      const result = await prisma.calendarEvent.updateMany({
+        where: { id: eventId, status: 'PENDING' },
         data: {
           status: 'REJECTED',
           reviewedBy: userId,
           reviewedAt: new Date(),
           metadata: metadata,
         },
+      });
+
+      if (result.count === 0) {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '이미 처리된 이벤트입니다.',
+        });
+        return;
+      }
+
+      const updatedEvent = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
       });
 
       res.status(200).json({
