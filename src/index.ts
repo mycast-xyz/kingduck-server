@@ -1,3 +1,4 @@
+import 'dotenv/config'; // .env 로드(JWT_SECRET_KEY 등) — config 임포트보다 먼저 실행되어야 함
 import express, { type ErrorRequestHandler } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';

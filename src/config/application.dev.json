@@ -4,7 +4,7 @@
   "port": 3000,
   "db_server": {
     "user": "postgres",
-    "password": "102468",
+    "password": "",
     "database": "game",
     "host": "127.0.0.1",
     "port": "5432",
@@ -16,7 +16,6 @@
       "idle": 10000
     }
   },
-  "JWT_SECRET_KEY": "54321FBE46264AB8A58C3AE318DFA3CE",
   "redis_server": {
     "port": 6379,
     "host": "localhost"
