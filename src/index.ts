@@ -12,17 +12,33 @@ import logger from './utils/logger';
 const app = express();
 const port = config.port;
 
+// CORS 허용 origin 화이트리스트: 기본값 + 환경변수 CORS_ORIGINS(콤마 구분) 병합
+const whitelist: string[] = [
+  'http://localhost:5173',
+  'http://121.173.23.70:5173',
+  'http://localhost:3000',
+  ...(process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : []),
+];
+
 // Private Network Access (PNA) 허용 헤더 추가 - CORS 미들웨어보다 먼저 실행
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Private-Network', 'true');
   next();
 });
 
-// OPTIONS 요청에 대해 명시적으로 PNA 헤더 포함하여 응답
+// OPTIONS 요청에 대해 PNA 헤더 포함하여 응답.
+// origin 반사 금지: 화이트리스트에 있을 때만 그 origin을 echo하고 Credentials 허용.
 app.options('*', (req, res) => {
+  const origin = req.headers.origin;
   res.header('Access-Control-Allow-Private-Network', 'true');
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  if (origin && whitelist.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.header(
     'Access-Control-Allow-Methods',
     'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -34,22 +50,19 @@ app.options('*', (req, res) => {
   res.sendStatus(204);
 });
 
-// 화이트리스트 설정
-const whitelist = [
-  'http://localhost:5173',
-  'http://121.173.23.70:5173',
-  'http://localhost:3000',
-];
-
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || whitelist.indexOf(origin) !== -1) {
+      // origin 없는 요청(서버 간, curl 등)은 허용
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (whitelist.includes(origin)) {
         callback(null, true);
       } else {
-        // 개발 편의를 위해 일단 허용하되 로그 남김 (원한다면 에러 처리: callback(new Error('Not allowed by CORS')))
         logger.warn(`Blocked by CORS: ${origin}`);
-        callback(null, true);
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,

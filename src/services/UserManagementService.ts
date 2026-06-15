@@ -114,12 +114,31 @@ class UserManagementService {
     role: string,
     permissions?: any,
   ) {
+    // role 값 화이트리스트 검증
+    const VALID_ROLES = ['USER', 'MANAGER', 'ADMIN'];
+    if (!VALID_ROLES.includes(role)) {
+      throw new Error('유효하지 않은 Role입니다.');
+    }
+
+    // 자기 자신 role 변경 금지
+    if (adminId === targetUserId) {
+      throw new Error('자신의 Role은 변경할 수 없습니다.');
+    }
+
     const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
     });
 
     if (!targetUser) {
       throw new Error('사용자를 찾을 수 없습니다.');
+    }
+
+    // 마지막 ADMIN 강등 방지
+    if ((targetUser.role as string) === 'ADMIN' && role !== 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' as any } });
+      if (adminCount <= 1) {
+        throw new Error('마지막 ADMIN의 역할은 변경할 수 없습니다.');
+      }
     }
 
     const oldRole = targetUser.role;

@@ -575,7 +575,8 @@ router.get('/user/:userId', UserManagementController.getUser);
  *       200:
  *         description: 권한 수정 성공
  */
-router.put('/user/:userId/role', UserManagementController.updateUserRole);
+// role 변경은 ADMIN 전용 — 전역 authorize(['ADMIN','MANAGER']) 이후 추가 검사로 MANAGER 차단
+router.put('/user/:userId/role', authorize(['ADMIN']), UserManagementController.updateUserRole);
 
 /**
  * @swagger
