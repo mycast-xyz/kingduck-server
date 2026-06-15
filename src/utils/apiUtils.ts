@@ -29,7 +29,7 @@ export const fetchPageConfig = async (url: string, waitTime: number = 3000) => {
   await new Promise((resolve) => setTimeout(resolve, waitTime));
   // window.PAGE_CONFIG 값 추출
   const pageConfig = await page.evaluate(() => {
-    return window.PAGE_CONFIG;
+    return (window as any).PAGE_CONFIG;
   });
   // 브라우저 종료
   await browser.close();

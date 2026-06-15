@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 
@@ -70,6 +70,30 @@ import { setupSwagger } from './utils/swagger';
 setupSwagger(app);
 
 app.use('/', routers);
+
+// 404 핸들러: 매칭되는 라우트가 없을 때 일관된 JSON 응답.
+app.use((req, res) => {
+  res.status(404).json({ resultCode: 404, message: 'Not Found' });
+});
+
+// 종단 에러 미들웨어: 동기 throw 및 next(err)로 전달된 에러를 잡아
+// 응답이 영영 전송되지 않고 매달리는 문제를 막는다.
+// (Express 4에서 async 라우트의 reject는 자동 전달되지 않으므로 핸들러 측 try/catch 또는 asyncHandler가 함께 필요하다.)
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  logger.error('❌ 처리되지 않은 라우트 에러:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  const status =
+    typeof err?.resultCode === 'number' && err.resultCode >= 400 && err.resultCode < 600
+      ? err.resultCode
+      : 500;
+  res.status(status).json({
+    resultCode: status,
+    message: err?.message || 'Internal Server Error',
+  });
+};
+app.use(errorHandler);
 
 const server = app.listen(port, '0.0.0.0', async () => {
   try {

@@ -34,7 +34,7 @@ class UserManagementController {
    */
   getUser = async (req: Request, res: Response) => {
     try {
-      const userId = parseInt(req.params.userId);
+      const userId = parseInt(String(req.params.userId));
       const user = await UserManagementService.getUserById(userId);
       res.status(200).json(user);
     } catch (error: any) {
@@ -54,7 +54,7 @@ class UserManagementController {
   updateUserRole = async (req: Request, res: Response) => {
     try {
       const adminId = req.user!.userId;
-      const targetUserId = parseInt(req.params.userId);
+      const targetUserId = parseInt(String(req.params.userId));
       const { role, permissions } = req.body;
 
       if (!role) {
@@ -87,7 +87,7 @@ class UserManagementController {
    */
   getUserLogs = async (req: Request, res: Response) => {
     try {
-      const targetUserId = parseInt(req.params.userId);
+      const targetUserId = parseInt(String(req.params.userId));
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
 

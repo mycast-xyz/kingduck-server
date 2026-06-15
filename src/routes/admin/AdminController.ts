@@ -268,7 +268,7 @@ export class AdminController {
    */
   async approveEvent(req: Request, res: Response): Promise<void> {
     try {
-      const eventId = parseInt(req.params.id);
+      const eventId = parseInt(String(req.params.id));
       const { edits } = req.body;
       const userId = (req as any).user?.id; // auth middleware에서 설정된 user
 
@@ -342,7 +342,7 @@ export class AdminController {
    */
   async rejectEvent(req: Request, res: Response): Promise<void> {
     try {
-      const eventId = parseInt(req.params.id);
+      const eventId = parseInt(String(req.params.id));
       const { reason } = req.body;
       const userId = (req as any).user?.id;
 
