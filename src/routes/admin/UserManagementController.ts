@@ -83,6 +83,34 @@ class UserManagementController {
   };
 
   /**
+   * 사용자 상태 변경 (ACTIVE / BANNED)
+   */
+  updateUserStatus = async (req: Request, res: Response) => {
+    try {
+      const adminId = req.user!.userId;
+      const targetUserId = parseInt(String(req.params.userId));
+      const { status } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ message: 'status는 필수입니다.' });
+      }
+
+      if (!['ACTIVE', 'BANNED'].includes(status)) {
+        return res.status(400).json({ message: '유효하지 않은 상태값입니다. ACTIVE 또는 BANNED만 허용됩니다.' });
+      }
+
+      const result = await UserManagementService.updateUserStatus(adminId, targetUserId, status);
+      res.status(200).json(result);
+    } catch (error: any) {
+      logger.error('Update User Status Error:', error);
+      if (error.message === '사용자를 찾을 수 없습니다.') {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message || '상태 변경 중 오류가 발생했습니다.' });
+    }
+  };
+
+  /**
    * 사용자 활동 로그 조회 (특정 사용자)
    */
   getUserLogs = async (req: Request, res: Response) => {

@@ -75,6 +75,18 @@ export const getElementList = async (gameSlug: string) => {
   });
 };
 
+export const getCharacterAdmin = async (id: number) => {
+  return await prisma.character.findUnique({
+    where: { id },
+    include: {
+      game: true,
+      element: true,
+      path: true,
+      videos: true,
+    },
+  });
+};
+
 export const getCharacterByName = async (gameSlug: string, name: string) => {
   return await prisma.character.findFirst({
     where: {

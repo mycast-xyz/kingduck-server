@@ -74,6 +74,28 @@ export const getDetailByOriginalId = async (req: Request, res: Response) => {
   }
 };
 
+export const getAdminDetail = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+
+    const characterId = Number(id);
+    if (isNaN(characterId)) {
+      return res.status(400).json({ message: 'Invalid character ID' });
+    }
+
+    const data = await service.getCharacterAdmin(characterId);
+
+    if (!data) {
+      return res.status(404).json({ message: 'Character not found' });
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 export const getCharacterDetailByName = async (req: Request, res: Response) => {
   try {
     const { gameSlug, name } = req.params as { gameSlug: string; name: string };

@@ -102,6 +102,53 @@ class UserManagementService {
   }
 
   /**
+   * 사용자 상태 변경 (ACTIVE / BANNED)
+   * User 모델에 status 필드가 없으므로 permissions JSON 내 _status 키로 관리
+   */
+  async updateUserStatus(
+    adminId: number,
+    targetUserId: number,
+    status: string,
+  ) {
+    const VALID_STATUSES = ['ACTIVE', 'BANNED'];
+    if (!VALID_STATUSES.includes(status)) {
+      throw new Error('유효하지 않은 상태값입니다. ACTIVE 또는 BANNED만 허용됩니다.');
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new Error('사용자를 찾을 수 없습니다.');
+    }
+
+    const currentPermissions =
+      targetUser.permissions && typeof targetUser.permissions === 'object' && !Array.isArray(targetUser.permissions)
+        ? (targetUser.permissions as Record<string, any>)
+        : {};
+
+    const updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        permissions: {
+          ...currentPermissions,
+          _status: status,
+        },
+      },
+      select: { id: true, email: true, role: true, permissions: true },
+    });
+
+    await UserActivityService.logActivity(adminId, 'UPDATE_STATUS', {
+      targetUserId,
+      targetUserEmail: targetUser.email,
+      changes: { status: { to: status } },
+    });
+
+    return { ...updatedUser, status };
+  }
+
+  /**
    * 사용자 권한 수정
    * @param adminId 수정하는 관리자 ID
    * @param targetUserId 대상 사용자 ID

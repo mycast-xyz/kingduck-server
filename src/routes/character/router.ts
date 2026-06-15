@@ -2,11 +2,36 @@ import { Router } from 'express';
 import {
   getList,
   getDetail,
+  getAdminDetail,
   getCharacterDetailByName,
   getDetailByOriginalId,
 } from './controller';
 
 const router = Router();
+
+/**
+ * @swagger
+ * /api/v0/character/admin/{id}:
+ *   get:
+ *     summary: 캐릭터 상세 조회 (어드민 - gameSlug 무관)
+ *     tags: [Character]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: number (캐릭터 ID)
+ *     responses:
+ *       200:
+ *         description: 캐릭터 상세 정보 반환 성공
+ *       400:
+ *         description: 유효하지 않은 캐릭터 ID
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ */
+// admin 전용 조회 — /:gameSlug/:id 보다 먼저 등록해야 'admin' 이 gameSlug 로 매칭되지 않는다
+router.get('/admin/:id', getAdminDetail);
 
 /**
  * @swagger

@@ -8,6 +8,7 @@ import admin from './admin/router';
 import video from './video/router';
 import redeem from './redeem/router';
 import event from './event/router';
+import skill from './skill/router';
 
 const routes = Router();
 
@@ -21,5 +22,6 @@ routes.use('/api/v0/admin/', admin);
 routes.use('/api/v0/video/', video);
 routes.use('/api/v0/redeem/', redeem);
 routes.use('/api/v0/event/', event);
+routes.use('/api/v0/skill/', skill);
 
 export default routes;

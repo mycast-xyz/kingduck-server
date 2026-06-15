@@ -580,6 +580,41 @@ router.put('/user/:userId/role', authorize(['ADMIN']), UserManagementController.
 
 /**
  * @swagger
+ * /api/v0/admin/user/{userId}/status:
+ *   patch:
+ *     summary: 사용자 상태 변경 (ACTIVE / BANNED)
+ *     tags: [Admin - User]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [ACTIVE, BANNED]
+ *     responses:
+ *       200:
+ *         description: 상태 변경 성공
+ *       400:
+ *         description: 유효하지 않은 상태값
+ *       404:
+ *         description: 사용자를 찾을 수 없음
+ */
+router.patch('/user/:userId/status', UserManagementController.updateUserStatus);
+
+/**
+ * @swagger
  * /api/v0/admin/user/{userId}/logs:
  *   get:
  *     summary: 특정 사용자의 활동 로그 조회
