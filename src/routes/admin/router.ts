@@ -139,6 +139,100 @@ router.get('/item/list', AdminController.getItemList);
  */
 router.get('/event/list', AdminController.getEventList);
 
+/**
+ * @swagger
+ * /api/v0/admin/event:
+ *   post:
+ *     summary: 이벤트 생성 (어드민 직접 등록)
+ *     tags: [Admin - Event CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gameId, title, type, startTime, endTime]
+ *             properties:
+ *               gameId:
+ *                 type: integer
+ *               title:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: [GACHA, EVENT, MAINTENANCE, SPECIAL]
+ *               startTime:
+ *                 type: string
+ *                 format: date-time
+ *               endTime:
+ *                 type: string
+ *                 format: date-time
+ *               image:
+ *                 type: string
+ *               officialLink:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               characterName:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 이벤트 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ */
+router.post('/event', AdminController.createEvent);
+
+/**
+ * @swagger
+ * /api/v0/admin/event/{id}:
+ *   put:
+ *     summary: 이벤트 수정 (어드민)
+ *     tags: [Admin - Event CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: 이벤트 수정 성공
+ *       404:
+ *         description: 이벤트를 찾을 수 없음
+ */
+router.put('/event/:id', AdminController.updateEvent);
+
+/**
+ * @swagger
+ * /api/v0/admin/event/{id}:
+ *   delete:
+ *     summary: 이벤트 삭제 (어드민)
+ *     tags: [Admin - Event CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 이벤트 삭제 성공
+ *       404:
+ *         description: 이벤트를 찾을 수 없음
+ */
+router.delete('/event/:id', AdminController.deleteEvent);
+
 // 크롤러 관리
 
 /**

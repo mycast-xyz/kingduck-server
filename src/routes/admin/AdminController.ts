@@ -170,7 +170,7 @@ export class AdminController {
         ? parseInt(req.query.gameId as string)
         : undefined;
       const type = req.query.type as string;
-      const title = req.query.title as string;
+      const title = (req.query.title || req.query.name) as string;
 
       const skip = (page - 1) * limit;
 
@@ -329,6 +329,171 @@ export class AdminController {
       });
     } catch (error) {
       console.error('approveEvent Error:', error);
+      res.status(500).json({
+        resultCode: 500,
+        resultMsg: '서버 오류가 발생했습니다.',
+      });
+    }
+  }
+
+  /**
+   * 이벤트 생성 (어드민 직접 등록)
+   * POST /api/v0/admin/event
+   */
+  async createEvent(req: Request, res: Response): Promise<void> {
+    try {
+      const { gameId, title, type, startTime, endTime, image, officialLink, description, characterName } = req.body;
+
+      if (!gameId || !title || !type || !startTime || !endTime) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(gameId, title, type, startTime, endTime)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      const metadata: Record<string, string> = {};
+      if (description) metadata.description = description;
+      if (characterName) metadata.characterName = characterName;
+
+      const event = await prisma.calendarEvent.create({
+        data: {
+          gameId: parseInt(String(gameId)),
+          title,
+          type,
+          startTime: new Date(startTime),
+          endTime: new Date(endTime),
+          imageUrl: image || null,
+          officialLink: officialLink || null,
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          status: 'APPROVED',
+        },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '이벤트가 생성되었습니다.',
+        data: event,
+      });
+    } catch (error) {
+      console.error('createEvent Error:', error);
+      res.status(500).json({
+        resultCode: 500,
+        resultMsg: '서버 오류가 발생했습니다.',
+      });
+    }
+  }
+
+  /**
+   * 이벤트 수정 (어드민)
+   * PUT /api/v0/admin/event/:id
+   */
+  async updateEvent(req: Request, res: Response): Promise<void> {
+    try {
+      const eventId = parseInt(String(req.params.id));
+
+      if (!eventId) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: 'eventId가 필요합니다.',
+        });
+        return;
+      }
+
+      const existing = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
+      });
+
+      if (!existing) {
+        res.status(404).json({
+          resultCode: 404,
+          resultMsg: '이벤트를 찾을 수 없습니다.',
+        });
+        return;
+      }
+
+      const { gameId, title, type, startTime, endTime, image, officialLink, description, characterName } = req.body;
+
+      const updateData: any = {};
+      if (gameId !== undefined) updateData.gameId = parseInt(String(gameId));
+      if (title !== undefined) updateData.title = title;
+      if (type !== undefined) updateData.type = type;
+      if (startTime !== undefined) updateData.startTime = new Date(startTime);
+      if (endTime !== undefined) updateData.endTime = new Date(endTime);
+      if (image !== undefined) updateData.imageUrl = image || null;
+      if (officialLink !== undefined) updateData.officialLink = officialLink || null;
+
+      // description / characterName 은 스키마에 없으므로 metadata 에 병합
+      if (description !== undefined || characterName !== undefined) {
+        const existingMeta = (existing.metadata as Record<string, string>) || {};
+        if (description !== undefined) existingMeta.description = description;
+        if (characterName !== undefined) existingMeta.characterName = characterName;
+        updateData.metadata = existingMeta;
+      }
+
+      const updatedEvent = await prisma.calendarEvent.update({
+        where: { id: eventId },
+        data: updateData,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '이벤트가 수정되었습니다.',
+        data: updatedEvent,
+      });
+    } catch (error) {
+      console.error('updateEvent Error:', error);
+      res.status(500).json({
+        resultCode: 500,
+        resultMsg: '서버 오류가 발생했습니다.',
+      });
+    }
+  }
+
+  /**
+   * 이벤트 삭제 (어드민)
+   * DELETE /api/v0/admin/event/:id
+   */
+  async deleteEvent(req: Request, res: Response): Promise<void> {
+    try {
+      const eventId = parseInt(String(req.params.id));
+
+      if (!eventId) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: 'eventId가 필요합니다.',
+        });
+        return;
+      }
+
+      const existing = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
+      });
+
+      if (!existing) {
+        res.status(404).json({
+          resultCode: 404,
+          resultMsg: '이벤트를 찾을 수 없습니다.',
+        });
+        return;
+      }
+
+      await prisma.calendarEvent.delete({
+        where: { id: eventId },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '이벤트가 삭제되었습니다.',
+      });
+    } catch (error) {
+      console.error('deleteEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
