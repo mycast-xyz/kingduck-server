@@ -172,7 +172,9 @@ export class DataSyncService {
           },
         });
 
-        const itemType = dataItem.metadata?.type || 'Unknown';
+        // Item.type 컬럼은 String. 일부 게임(엔드필드)은 metadata.type이 숫자(예: 8)라
+        // 그대로 넣으면 Prisma가 거부한다. 항상 문자열로 강제(0도 'Unknown'으로 오인 않도록 ??).
+        const itemType = String(dataItem.metadata?.type ?? 'Unknown');
 
         if (existing) {
           await prisma.item.update({
