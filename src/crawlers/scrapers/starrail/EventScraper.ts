@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import fs from 'fs';
 import path from 'path';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
@@ -30,7 +30,7 @@ export class EventScraper extends ScraperBase {
     const results: ScrapedData[] = [];
 
     try {
-      const response = await axios.get(this.API_URL, {
+      const response = await axiosGetWithRetry<any>(this.API_URL, {
         timeout: 15000,
         headers: {
           'User-Agent':
@@ -97,7 +97,7 @@ export class EventScraper extends ScraperBase {
     try {
       await this.delay(200);
       const detailUrl = `https://bbs-api-os.hoyolab.com/community/post/wapi/getPostFull?post_id=${postId}`;
-      const detailRes = await axios.get(detailUrl, {
+      const detailRes = await axiosGetWithRetry<any>(detailUrl, {
         timeout: 15000,
         headers: {
           'User-Agent':
@@ -134,7 +134,7 @@ export class EventScraper extends ScraperBase {
     try {
       await this.delay(200);
       const detailUrl = `https://bbs-api-os.hoyolab.com/community/post/wapi/getPostFull?post_id=${post.post_id}`;
-      const detailRes = await axios.get(detailUrl, {
+      const detailRes = await axiosGetWithRetry<any>(detailUrl, {
         timeout: 15000,
         headers: {
           'User-Agent':

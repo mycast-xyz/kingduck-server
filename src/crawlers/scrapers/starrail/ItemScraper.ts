@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
@@ -42,7 +42,9 @@ export class StarRailItemScraper extends ScraperBase {
       const gameId = game.id;
 
       // 1. Fetch data
-      const { data: itemMap } = await axios.get(this.API_URL, { timeout: 15000 });
+      const { data: itemMap } = await axiosGetWithRetry<any>(this.API_URL, {
+        timeout: 15000,
+      });
 
       // The API returns an object where keys are IDs. Convert to array.
       const list = Object.values(itemMap) as any[];

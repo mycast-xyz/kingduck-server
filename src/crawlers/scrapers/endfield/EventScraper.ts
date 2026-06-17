@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import fs from 'fs';
 import path from 'path';
 import * as cheerio from 'cheerio';
@@ -41,7 +41,7 @@ export class EventScraper extends ScraperBase {
 
     try {
       // Fetch the list of posts
-      const listResponse = await axios.get(this.LIST_API_URL, {
+      const listResponse = await axiosGetWithRetry<any>(this.LIST_API_URL, {
         timeout: 15000,
         headers: {
           'User-Agent':
@@ -72,7 +72,7 @@ export class EventScraper extends ScraperBase {
 
           // Fetch detail information
           await this.delay(200);
-          const detailResponse = await axios.get(
+          const detailResponse = await axiosGetWithRetry<any>(
             `${this.DETAIL_API_URL_BASE}${feed.feedId}`,
             {
               timeout: 15000,

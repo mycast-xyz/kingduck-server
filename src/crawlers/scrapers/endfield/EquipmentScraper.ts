@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import { ScraperBase } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
@@ -54,7 +54,10 @@ export class EndfieldEquipmentScraper extends ScraperBase {
 
       for (const [key, url] of Object.entries(I18N_URLS)) {
         try {
-          const { data: i18nData } = await axios.get(url, { headers: HEADERS, timeout: 15000 });
+          const { data: i18nData } = await axiosGetWithRetry<any>(url, {
+            headers: HEADERS,
+            timeout: 15000,
+          });
           Object.assign(i18nMap, i18nData);
           logger.info(`Loaded ${key} I18n data.`);
         } catch (e) {
@@ -76,7 +79,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
 
       // 3. Fetch Suit List
       logger.info('Fetching Equipment Suit List...');
-      const { data: suitListData } = await axios.get(
+      const { data: suitListData } = await axiosGetWithRetry<any>(
         BASE_EQUIPMENT_SUIT_LIST_URL,
         {
           headers: HEADERS,
@@ -104,10 +107,13 @@ export class EndfieldEquipmentScraper extends ScraperBase {
         try {
           // 4. Fetch Suit Detail
           const suitDetailUrl = `${BASE_EQUIPMENT_SUIT_DETAIL_URL}/${suitId}.json`;
-          const { data: suitDetail } = await axios.get(suitDetailUrl, {
-            headers: HEADERS,
-            timeout: 15000,
-          });
+          const { data: suitDetail } = await axiosGetWithRetry<any>(
+            suitDetailUrl,
+            {
+              headers: HEADERS,
+              timeout: 15000,
+            },
+          );
 
           const resolvedSuit = resolveIds(suitDetail, i18nMap);
 
@@ -165,10 +171,13 @@ export class EndfieldEquipmentScraper extends ScraperBase {
               // 6. Fetch Item Detail
               const itemDetailUrl = `${BASE_EQUIPMENT_ITEM_DETAIL_URL}/${itemId}.json`;
               try {
-                const { data: itemDetail } = await axios.get(itemDetailUrl, {
-                  headers: HEADERS,
-                  timeout: 15000,
-                });
+                const { data: itemDetail } = await axiosGetWithRetry<any>(
+                  itemDetailUrl,
+                  {
+                    headers: HEADERS,
+                    timeout: 15000,
+                  },
+                );
                 const resolvedItem = resolveIds(itemDetail, i18nMap);
 
                 // Resolve Name

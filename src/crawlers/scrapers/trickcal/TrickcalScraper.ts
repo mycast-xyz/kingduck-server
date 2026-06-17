@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import fs from 'fs';
 import path from 'path';
 import initSqlJs from 'sql.js';
@@ -25,9 +25,7 @@ export class TrickcalScraper {
     }
 
     logger.info(`Downloading DB from ${this.dbUrl}...`);
-    const response = await axios({
-      url: this.dbUrl,
-      method: 'GET',
+    const response = await axiosGetWithRetry<any>(this.dbUrl, {
       responseType: 'arraybuffer',
       timeout: 15000,
     });

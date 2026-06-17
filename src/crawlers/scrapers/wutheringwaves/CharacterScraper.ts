@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { BASE_API_URL } from './utils';
@@ -60,7 +60,10 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
       const gameId = game.id;
 
       // 2. Get List from API
-      const { data } = await axios.get(`${BASE_API_URL}/character`, { timeout: 15000 });
+      const { data } = await axiosGetWithRetry<any>(
+        `${BASE_API_URL}/character`,
+        { timeout: 15000 },
+      );
       let list = data.roleList || [];
 
       if (options?.limit) {
@@ -83,7 +86,7 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
           // 3. Fetch Detail
           // Note: The list item ID key might be 'Id' or 'id' depending on API consistentcy.
           // In previous check it was `item.Id`.
-          const { data: detailData } = await axios.get(
+          const { data: detailData } = await axiosGetWithRetry<any>(
             `${BASE_API_URL}/character/${item.Id}`,
             { timeout: 15000 },
           );

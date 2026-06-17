@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from '../../utils/httpRetry';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { BASE_API_URL } from './utils';
@@ -54,7 +54,9 @@ export class WutheringWavesItemScraper extends ScraperBase {
       }
       const gameId = game.id;
 
-      const { data } = await axios.get(`${BASE_API_URL}/item`, { timeout: 15000 });
+      const { data } = await axiosGetWithRetry<any>(`${BASE_API_URL}/item`, {
+        timeout: 15000,
+      });
       let list = data.itemList || [];
       const results: ScrapedData[] = [];
 
@@ -75,7 +77,9 @@ export class WutheringWavesItemScraper extends ScraperBase {
         const detailUrl = `${BASE_API_URL}/item/${item.Id}`;
         let rawDetailData = item;
         try {
-          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
+          const { data: detail } = await axiosGetWithRetry<any>(detailUrl, {
+            timeout: 15000,
+          });
           rawDetailData = { ...item, ...detail };
         } catch (err) {
           logger.warn(`Failed to fetch detail for item ${item.Id}:`, err);
