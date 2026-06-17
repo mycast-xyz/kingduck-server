@@ -6,6 +6,7 @@ import {
   getCharacterDetailByName,
   getDetailByOriginalId,
 } from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ const router = Router();
  *         description: 캐릭터를 찾을 수 없음
  */
 // admin 전용 조회 — /:gameSlug/:id 보다 먼저 등록해야 'admin' 이 gameSlug 로 매칭되지 않는다
-router.get('/admin/:id', getAdminDetail);
+router.get('/admin/:id', asyncHandler(getAdminDetail));
 
 /**
  * @swagger
@@ -81,7 +82,7 @@ router.get('/admin/:id', getAdminDetail);
  *       200:
  *         description: 캐릭터 리스트 반환 성공
  */
-router.get('/:gameSlug/list', getList);
+router.get('/:gameSlug/list', asyncHandler(getList));
 
 /**
  * @swagger
@@ -108,7 +109,7 @@ router.get('/:gameSlug/list', getList);
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/:gameSlug/:id', getDetail);
+router.get('/:gameSlug/:id', asyncHandler(getDetail));
 /**
  * @swagger
  * /api/v0/character/{gameSlug}/name/{name}:
@@ -134,7 +135,7 @@ router.get('/:gameSlug/:id', getDetail);
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/:gameSlug/name/:name', getCharacterDetailByName);
+router.get('/:gameSlug/name/:name', asyncHandler(getCharacterDetailByName));
 
 /**
  * @swagger
@@ -161,6 +162,6 @@ router.get('/:gameSlug/name/:name', getCharacterDetailByName);
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/:gameId/original/:originalId', getDetailByOriginalId);
+router.get('/:gameId/original/:originalId', asyncHandler(getDetailByOriginalId));
 
 export default router;

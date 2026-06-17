@@ -21,7 +21,16 @@ declare global {
   }
 }
 
-export const authorize = (allowedRoles: string[]) => {
+interface AuthorizeOptions {
+  // true면 매 요청마다 DB에서 사용자 role/밴 상태를 재확인한다(stateless JWT의 한계 보완).
+  // 토큰 발급(최대 1일) 이후의 강등/밴이 즉시 반영된다. 민감 라우트(어드민)에 사용.
+  recheckDb?: boolean;
+}
+
+export const authorize = (
+  allowedRoles: string[],
+  options: AuthorizeOptions = {},
+) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const authHeader = req.headers.authorization;
@@ -38,10 +47,29 @@ export const authorize = (allowedRoles: string[]) => {
       const decoded = jwt.verify(token, config.JWT_SECRET_KEY) as DecodedToken;
       req.user = decoded;
 
-      // Check if user exists in DB and explicitly check role if needed (optional for stateless JWT but safer)
-      // For now, trust the token role to save DB call, OR fetch user to ensure not banned etc.
-      // Let's verify role match.
-      if (allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {
+      // 기본: 토큰의 role을 신뢰(무상태, DB 호출 절약).
+      let effectiveRole = decoded.role;
+
+      // recheckDb: 민감 작업은 DB에서 현재 role/밴 상태를 재확인한다(B-S6).
+      // 밴은 별도 컬럼이 없어 permissions._status === 'banned'로 저장됨(B-H1 임시 방식).
+      if (options.recheckDb) {
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: { role: true, permissions: true },
+        });
+        if (!user) {
+          return res.status(401).json({ message: '존재하지 않는 사용자입니다.' });
+        }
+        const status = (user.permissions as { _status?: string } | null)?._status;
+        if (status === 'banned') {
+          return res.status(403).json({ message: '정지된 계정입니다.' });
+        }
+        effectiveRole = user.role;
+        // 토큰 role과 DB role이 다르면(강등 등) DB를 신뢰하도록 req.user 갱신
+        req.user = { ...decoded, role: user.role };
+      }
+
+      if (allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
         return res.status(403).json({ message: '접근 권한이 없습니다.' });
       }
 

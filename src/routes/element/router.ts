@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -36,6 +37,6 @@ const router = Router();
  *       500:
  *         description: 서버 오류
  */
-router.get('/list', controller.getList);
+router.get('/list', asyncHandler(controller.getList));
 
 export default router;

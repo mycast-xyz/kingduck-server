@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const router = Router();
  *       404:
  *         description: 이벤트를 찾을 수 없음
  * */
-router.get('/detail/:id', controller.getEvent);
+router.get('/detail/:id', asyncHandler(controller.getEvent));
 /**
  * @swagger
  * /api/v0/event/{slug}:
@@ -42,6 +43,6 @@ router.get('/detail/:id', controller.getEvent);
  *       404:
  *         description: 게임을 찾을 수 없음
  * */
-router.get('/:slug', controller.getEvents);
+router.get('/:slug', asyncHandler(controller.getEvents));
 
 export default router;

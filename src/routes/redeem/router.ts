@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -22,6 +23,6 @@ const router = Router();
  *       404:
  *         description: 게임을 찾을 수 없음
  * */
-router.get('/:slug', controller.getRedeemCodes);
+router.get('/:slug', asyncHandler(controller.getRedeemCodes));
 
 export default router;

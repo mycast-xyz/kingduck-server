@@ -28,8 +28,6 @@ const refreshToken = (token: string): string | null => {
       userUUID: decoded.userUUID,
     };
 
-    console.log(payload);
-
     // 새로운 토큰 생성
     const newToken = generateToken(payload);
     return newToken;

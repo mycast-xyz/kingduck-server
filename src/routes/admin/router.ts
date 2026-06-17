@@ -7,8 +7,9 @@ import { authorize } from '../../middleware/auth';
 
 const router = express.Router();
 
-// 모든 Admin 라우트는 ADMIN 권한 필요
-router.use(authorize(['ADMIN', 'MANAGER']));
+// 모든 Admin 라우트는 ADMIN/MANAGER 권한 필요.
+// recheckDb: 어드민은 민감 작업이라 매 요청 DB에서 role/밴 상태를 재확인(강등/밴 즉시 반영, B-S6).
+router.use(authorize(['ADMIN', 'MANAGER'], { recheckDb: true }));
 
 /**
  * @swagger
@@ -576,7 +577,7 @@ router.get('/user/:userId', UserManagementController.getUser);
  *         description: 권한 수정 성공
  */
 // role 변경은 ADMIN 전용 — 전역 authorize(['ADMIN','MANAGER']) 이후 추가 검사로 MANAGER 차단
-router.put('/user/:userId/role', authorize(['ADMIN']), UserManagementController.updateUserRole);
+router.put('/user/:userId/role', authorize(['ADMIN'], { recheckDb: true }), UserManagementController.updateUserRole);
 
 /**
  * @swagger

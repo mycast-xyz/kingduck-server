@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ const router = Router();
  *       200:
  *         description: 아이템 리스트 반환 성공
  */
-router.get('/list', controller.getList);
+router.get('/list', asyncHandler(controller.getList));
 
 /**
  * @swagger
@@ -51,6 +52,6 @@ router.get('/list', controller.getList);
  *       404:
  *         description: 아이템을 찾을 수 없음
  */
-router.get('/:gameSlug/name/:name', controller.getItemByName);
+router.get('/:gameSlug/name/:name', asyncHandler(controller.getItemByName));
 
 export default router;

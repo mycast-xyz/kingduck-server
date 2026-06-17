@@ -8,8 +8,31 @@ import helmet from 'helmet';
 import { config } from './config/config';
 import routers from './routes/';
 import { prisma } from './utils/prisma';
+import { CrawlerStatus } from '@prisma/client';
 import path from 'path';
 import logger from './utils/logger';
+
+// 크롤은 서버와 별도 프로세스(`pnpm run crawl`)로 돌기 때문에, 프로세스가 크롤 도중 죽으면
+// crawler_logs에 RUNNING 상태가 영구히 남고, 중복실행 가드가 그 작업의 재실행을 영영 막는다(B-L3).
+// 기동 시 임계 시간(어떤 정상 크롤보다 충분히 긴 값)을 초과한 RUNNING 로그만 FAILED로 정리한다.
+// (진행 중인 별도 크롤 프로세스를 오인 종료하지 않도록 임계값을 넉넉히 둔다.)
+const STALE_RUNNING_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2시간
+
+async function sweepStaleCrawlerLogs(): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_RUNNING_THRESHOLD_MS);
+  const { count } = await prisma.crawlerLog.updateMany({
+    where: { status: CrawlerStatus.RUNNING, startTime: { lt: cutoff } },
+    data: {
+      status: CrawlerStatus.FAILED,
+      endTime: new Date(),
+      errorMsg:
+        'Stale RUNNING swept on server startup (process died mid-run; was blocking re-runs).',
+    },
+  });
+  if (count > 0) {
+    logger.warn(`🧹 Swept ${count} stale RUNNING crawler log(s) → FAILED.`);
+  }
+}
 
 const app = express();
 const port = config.port;
@@ -91,6 +114,17 @@ app.use('/assets', express.static(path.join(__dirname, '../static')));
 import { setupSwagger } from './utils/swagger';
 setupSwagger(app);
 
+// 헬스 체크: DB 연결까지 확인. 오케스트레이터/로드밸런서/compose healthcheck가 사용.
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: 'ok', db: 'up' });
+  } catch (e) {
+    logger.error('Health check DB ping 실패:', e);
+    res.status(503).json({ status: 'error', db: 'down' });
+  }
+});
+
 app.use('/', routers);
 
 // 404 핸들러: 매칭되는 라우트가 없을 때 일관된 JSON 응답.
@@ -117,22 +151,79 @@ const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
 };
 app.use(errorHandler);
 
-const server = app.listen(port, '0.0.0.0', async () => {
-  try {
-    logger.info(`✅ Example app listening on port ${port} (0.0.0.0)`);
-
-    await prisma.$connect();
-    logger.info(`✅ Database connected (Prisma)`);
-  } catch (error) {
-    logger.error('❌ 서버 시작 실패:', error);
+// DB는 listen 전에 연결한다(재시도 후 실패 시 fail-fast). 연결 없이 listen하면
+// 헬스 위장 + 모든 요청 500인 좀비 프로세스가 된다(B-L1).
+const MAX_DB_RETRIES = 5;
+async function connectWithRetry(): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
+    try {
+      await prisma.$connect();
+      logger.info('✅ Database connected (Prisma)');
+      return;
+    } catch (error) {
+      logger.error(`❌ DB 연결 실패 (시도 ${attempt}/${MAX_DB_RETRIES}):`, error);
+      if (attempt === MAX_DB_RETRIES) {
+        logger.error('❌ DB 연결 재시도 소진 — 프로세스를 종료합니다(exit 1).');
+        await prisma.$disconnect().catch(() => {});
+        process.exit(1);
+      }
+      await new Promise((r) => setTimeout(r, attempt * 2000)); // 선형 백오프
+    }
   }
-});
+}
 
-server.on('error', (error) => {
-  logger.error('❌ 서버 에러 발생:', error);
-});
+// graceful shutdown: in-flight 요청을 마무리하고 DB 연결을 정리한 뒤 종료한다.
+function setupGracefulShutdown(srv: import('http').Server): void {
+  let shuttingDown = false;
+  const shutdown = (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info(`🛑 ${signal} 수신 — graceful shutdown 시작`);
 
-process.on('unhandledRejection', (reason, promise) => {
+    // 30초 내 정리되지 않으면 강제 종료
+    const force = setTimeout(() => {
+      logger.error('❌ graceful shutdown 타임아웃 — 강제 종료');
+      process.exit(1);
+    }, 30_000);
+    force.unref();
+
+    srv.close(async () => {
+      try {
+        await prisma.$disconnect();
+        logger.info('✅ 정리 완료 — 종료');
+        process.exit(0);
+      } catch (e) {
+        logger.error('❌ 종료 중 오류:', e);
+        process.exit(1);
+      }
+    });
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
+async function startServer(): Promise<void> {
+  await connectWithRetry();
+
+  // 기동 시 좀비 RUNNING 크롤 로그 정리 (B-L3)
+  await sweepStaleCrawlerLogs().catch((e) =>
+    logger.error('stale 크롤 로그 정리 실패:', e),
+  );
+
+  const server = app.listen(port, '0.0.0.0', () => {
+    logger.info(`✅ Example app listening on port ${port} (0.0.0.0)`);
+  });
+
+  server.on('error', (error) => {
+    logger.error('❌ 서버 에러 발생:', error);
+  });
+
+  setupGracefulShutdown(server);
+}
+
+startServer();
+
+process.on('unhandledRejection', (reason) => {
   logger.error('❌ 처리되지 않은 Promise 거부:', reason);
 });
 

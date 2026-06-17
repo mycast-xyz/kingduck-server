@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -28,6 +29,6 @@ const router = Router();
  *       404:
  *         description: 캐릭터를 찾을 수 없음
  */
-router.get('/list', controller.getList);
+router.get('/list', asyncHandler(controller.getList));
 
 export default router;
