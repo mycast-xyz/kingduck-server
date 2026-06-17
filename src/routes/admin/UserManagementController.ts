@@ -2,11 +2,7 @@ import { Request, Response } from 'express';
 import UserManagementService from '../../services/UserManagementService';
 import UserActivityService from '../../services/UserActivityService';
 import logger from '../../utils/logger';
-
-// B-H3: 페이지네이션 입력 클램프 헬퍼
-// ?limit=99999999 (전체 로드) 및 ?page=-5 (음수 skip → Prisma 500) 방지
-const clampPage = (v: number): number => Math.max(v, 1);
-const clampLimit = (v: number): number => Math.min(Math.max(v, 1), 100);
+import { clampPage, clampLimit } from '../../utils/pagination';
 
 class UserManagementController {
   /**

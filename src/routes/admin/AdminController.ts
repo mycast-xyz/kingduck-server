@@ -2,11 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
 import { sendOk } from '../../utils/responseBuilder';
-
-// B-H3: 페이지네이션 입력 클램프 헬퍼
-// ?limit=99999999 (전체 로드) 및 ?page=-5 (음수 skip → Prisma 500) 방지
-const clampPage = (v: number): number => Math.max(v, 1);
-const clampLimit = (v: number): number => Math.min(Math.max(v, 1), 100);
+import { clampPage, clampLimit } from '../../utils/pagination';
 
 export class AdminController {
   /**
