@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as service from './service';
 import logger from '../../utils/logger';
+import { sendOk, sendError } from '../../utils/responseBuilder';
 
 export const getList = async (req: Request, res: Response) => {
   try {
@@ -9,10 +10,10 @@ export const getList = async (req: Request, res: Response) => {
       originalId as string,
       gameId ? Number(gameId) : undefined,
     );
-    res.status(200).json(data);
+    sendOk(res, data);
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    sendError(res, 500, 'Internal Server Error');
   }
 };
 
@@ -23,12 +24,12 @@ export const getItemByName = async (req: Request, res: Response) => {
     const data = await service.getItemByName(gameSlug, name);
 
     if (!data) {
-      return res.status(404).json({ message: 'Item not found' });
+      return sendError(res, 404, 'Item not found');
     }
 
-    res.status(200).json(data);
+    sendOk(res, data);
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    sendError(res, 500, 'Internal Server Error');
   }
 };

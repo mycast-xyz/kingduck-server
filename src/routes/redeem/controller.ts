@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as service from './service';
 import logger from '../../utils/logger';
+import { sendOk, sendError } from '../../utils/responseBuilder';
 
 export const getRedeemCodes = async (req: Request, res: Response) => {
   try {
@@ -8,12 +9,12 @@ export const getRedeemCodes = async (req: Request, res: Response) => {
     const codes = await service.getRedeemCodes(slug);
 
     if (codes === null) {
-      return res.status(404).json({ message: 'Game not found' });
+      return sendError(res, 404, 'Game not found');
     }
 
-    res.status(200).json(codes);
+    sendOk(res, codes);
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    sendError(res, 500, 'Internal Server Error');
   }
 };
