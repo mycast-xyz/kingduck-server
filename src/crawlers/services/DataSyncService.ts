@@ -154,20 +154,16 @@ export class DataSyncService {
           continue;
         }
 
-        // Check if item already exists by originalId in metadata
-        const existing = await prisma.item.findFirst({
-          where: {
-            gameId: game.id,
-            metadata: {
-              path: ['originalId'],
-              equals: originalId,
-            },
-          },
-        });
-
         // Item.type 컬럼은 String. 일부 게임(엔드필드)은 metadata.type이 숫자(예: 8)라
         // 그대로 넣으면 Prisma가 거부한다. 항상 문자열로 강제(0도 'Unknown'으로 오인 않도록 ??).
         const itemType = String(dataItem.metadata?.type ?? 'Unknown');
+        const oidStr = String(originalId);
+
+        // 인덱스 컬럼 기반 매칭 (gameId, type, originalId). originalId는 타입을 가로질러
+        // 충돌하므로(예: starrail Material 101 vs RelicSet 101) type까지 포함해야 안전(B-H4b).
+        const existing = await prisma.item.findFirst({
+          where: { gameId: game.id, type: itemType, originalId: oidStr },
+        });
 
         if (existing) {
           await prisma.item.update({
@@ -175,6 +171,7 @@ export class DataSyncService {
             data: {
               name: dataItem.name,
               type: itemType,
+              originalId: oidStr, // 컬럼 동기화(B-H4b)
               rarity: dataItem.rarity || dataItem.metadata?.rarity,
               description:
                 dataItem.description || dataItem.metadata?.description,
@@ -192,6 +189,7 @@ export class DataSyncService {
               gameId: game.id,
               name: dataItem.name,
               type: itemType,
+              originalId: oidStr, // 컬럼 동기화(B-H4b)
               rarity: dataItem.rarity || dataItem.metadata?.rarity,
               description:
                 dataItem.description || dataItem.metadata?.description,

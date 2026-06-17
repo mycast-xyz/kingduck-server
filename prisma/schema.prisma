@@ -149,11 +149,12 @@ model Character {
 }
 
 model Item {
-  id     Int    @id @default(autoincrement())
-  gameId Int    @map("game_id")
-  name   String
-  type   String // 예: "Weapon", "Artifact", "Lightcone", "Echo", "Material"
-  rarity Int?
+  id         Int     @id @default(autoincrement())
+  gameId     Int     @map("game_id")
+  name       String
+  type       String // 예: "Weapon", "Artifact", "Lightcone", "Echo", "Material"
+  rarity     Int?
+  originalId String? @map("original_id") // 외부 소스 식별자 (B-H4b)
 
   description String? @db.Text
   imageUrl    String? @map("image_url")
@@ -166,6 +167,8 @@ model Item {
 
   game Game @relation(fields: [gameId], references: [id])
 
+  // originalId는 타입을 가로질러 충돌(예: starrail Material 101 vs RelicSet 101)하므로 type 포함 (B-H4b)
+  @@unique([gameId, type, originalId])
   @@index([gameId])
   @@map("items")
 }

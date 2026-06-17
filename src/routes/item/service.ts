@@ -4,9 +4,16 @@ import { prisma } from '../../utils/prisma';
 // 1000으로 충분하나, 초과 시 조용히 잘림(silent truncation) — gameId 필터를 사용할 것.
 const MAX_LIST = 1000;
 
-const withOriginalId = <T extends { metadata?: unknown }>(i: T) => ({
+const withOriginalId = <
+  T extends { originalId?: string | null; metadata?: unknown },
+>(
+  i: T,
+) => ({
   ...i,
-  originalId: (i.metadata as any)?.originalId as string | undefined,
+  // 컬럼 우선, 과거 데이터 호환용 metadata 폴백 (B-H4b)
+  originalId: (i.originalId ?? (i.metadata as any)?.originalId) as
+    | string
+    | undefined,
 });
 
 export const getItemList = async (originalId?: string, gameId?: number) => {
@@ -17,32 +24,9 @@ export const getItemList = async (originalId?: string, gameId?: number) => {
   }
 
   if (originalId) {
-    // Try to match strict string or number inside metadata.originalId
-    // Since we don't know if it's stored as number or string in JSON, we can try robust check or just strict equals if consistent.
-    // Based on previous scrapes, it's often a number. Prisma JSON filter 'equals' usually respects type.
-    // However, input query is string. We might try to cast to number.
-    const numId = Number(originalId);
-    if (!isNaN(numId)) {
-      where.OR = [
-        {
-          metadata: {
-            path: ['originalId'],
-            equals: numId,
-          },
-        },
-        {
-          metadata: {
-            path: ['originalId'],
-            equals: String(numId),
-          },
-        },
-      ];
-    } else {
-      where.metadata = {
-        path: ['originalId'],
-        equals: originalId,
-      };
-    }
+    // 인덱스 컬럼 기반(B-H4b). 컬럼은 항상 문자열로 저장됨(과거 metadata의 number/string
+    // 혼재 처리 불필요). type을 함께 넘기지 않으므로 동일 id의 다른 타입은 모두 반환됨(기존과 동일).
+    where.originalId = originalId;
   }
 
   const results = await prisma.item.findMany({

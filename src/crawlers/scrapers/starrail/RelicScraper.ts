@@ -112,18 +112,16 @@ export class RelicScraper extends ScraperBase {
 
         const description = `2pc: ${bonus2pc.desc}\n4pc: ${bonus4pc.desc}`;
 
-        // 3. 자체 upsert (스케줄러는 data.length만 사용)
+        // 3. 자체 upsert — (gameId, type:'RelicSet', originalId) 컬럼 매칭(타입 간 id 충돌
+        //    방지, 예: Material 101 vs RelicSet 101). originalId 컬럼도 동기화. (B-H4b)
         const existing = await prisma.item.findFirst({
-          where: {
-            gameId: game.id,
-            metadata: { path: ['originalId'], equals: originalId },
-          },
+          where: { gameId: game.id, type: 'RelicSet', originalId },
         });
 
         if (existing) {
           await prisma.item.update({
             where: { id: existing.id },
-            data: { name, rarity, imageUrl: localImageUrl, description, metadata },
+            data: { name, originalId, rarity, imageUrl: localImageUrl, description, metadata },
           });
           logger.info(`Updated RelicSet: ${name} (ID: ${originalId})`);
         } else {
@@ -132,6 +130,7 @@ export class RelicScraper extends ScraperBase {
               gameId: game.id,
               name,
               type: 'RelicSet',
+              originalId,
               rarity,
               imageUrl: localImageUrl,
               description,
