@@ -4,43 +4,40 @@ import logger from '../../utils/logger';
 
 export class DataSyncService {
   /**
-   * Find or create an Element by name and type
+   * 게임의 Element를 한 번에 선로딩한 뒤, 캐릭터 동기화 루프에서 캐릭터마다 find 쿼리를
+   * 날리지 않고 element/path id를 해석하는 리졸버를 만든다(N+1 방지, B-H5).
+   *
+   * 캐시에 없으면 생성하고 캐시에 추가한다. 크롤은 (game,type)별로 직렬 실행이 보장되므로
+   * in-memory 캐시로 충분하다(교차 실행 경쟁은 크롤러 중복실행 가드가 차단).
+   * 완전한 중복 방지는 @@unique([gameId, name, type]) 제약이 필요(별도 마이그레이션).
+   * 매칭은 기존과 동일하게 대소문자 무시.
    */
-  private async findOrCreateElement(
-    gameId: number,
-    name: string,
-    type: string,
-  ): Promise<number | null> {
-    if (!name) return null;
-
-    // NOTE: 완전한 중복 방지는 @@unique([gameId, name, type]) 제약이 필요합니다 (별도 마이그레이션).
-    // 트랜잭션으로 find→create 경쟁 창을 줄입니다.
-    return await prisma.$transaction(async (tx) => {
-      // Try to find existing element
-      const existing = await tx.element.findFirst({
-        where: {
-          gameId,
-          name: { equals: name, mode: 'insensitive' },
-          type,
-        },
-      });
-
-      if (existing) {
-        return existing.id;
-      }
-
-      // Create new element
-      const newElement = await tx.element.create({
-        data: {
-          gameId,
-          name,
-          type,
-        },
-      });
-
-      logger.info(`Created new ${type}: ${name}`);
-      return newElement.id;
+  private async createElementResolver(gameId: number) {
+    const rows = await prisma.element.findMany({
+      where: { gameId },
+      select: { id: true, name: true, type: true },
     });
+    const keyOf = (name: string, type: string) =>
+      `${type}:${name.toLowerCase()}`;
+    const cache = new Map<string, number>();
+    for (const r of rows) cache.set(keyOf(r.name, r.type), r.id);
+
+    return async (
+      name: string | undefined | null,
+      type: string,
+    ): Promise<number | null> => {
+      if (!name) return null;
+      const key = keyOf(name, type);
+      const cached = cache.get(key);
+      if (cached !== undefined) return cached;
+
+      const created = await prisma.element.create({
+        data: { gameId, name, type },
+      });
+      cache.set(key, created.id);
+      logger.info(`Created new ${type}: ${name}`);
+      return created.id;
+    };
   }
 
   public async syncCharacters(gameSlug: string, data: ScrapedData[]) {
@@ -56,6 +53,9 @@ export class DataSyncService {
     let successCount = 0;
     let errorCount = 0;
 
+    // Element를 선로딩한 리졸버로 캐릭터마다의 find 쿼리(N+1)를 제거(B-H5).
+    const resolveElement = await this.createElementResolver(game.id);
+
     // Upsert each character
     for (const item of data) {
       try {
@@ -65,19 +65,12 @@ export class DataSyncService {
           continue;
         }
 
-        // Find or create Element (DamageType)
-        const elementId = await this.findOrCreateElement(
-          game.id,
+        // Resolve Element (DamageType) / Path (BaseType) — 캐시 우선
+        const elementId = await resolveElement(
           item.metadata?.element,
           'DamageType',
         );
-
-        // Find or create Path (BaseType)
-        const pathId = await this.findOrCreateElement(
-          game.id,
-          item.metadata?.path,
-          'Path',
-        );
+        const pathId = await resolveElement(item.metadata?.path, 'Path');
 
         // Check if character already exists by originalId in metadata
         const existing = await prisma.character.findFirst({
