@@ -72,15 +72,9 @@ export class DataSyncService {
         );
         const pathId = await resolveElement(item.metadata?.path, 'Path');
 
-        // Check if character already exists by originalId in metadata
+        // 인덱스 컬럼 기반 매칭(B-H4b). originalId는 위에서 non-null 확인됨.
         const existing = await prisma.character.findFirst({
-          where: {
-            gameId: game.id,
-            metadata: {
-              path: ['originalId'],
-              equals: originalId,
-            },
-          },
+          where: { gameId: game.id, originalId: String(originalId) },
         });
 
         if (existing) {
@@ -89,6 +83,7 @@ export class DataSyncService {
             where: { id: existing.id },
             data: {
               name: item.name,
+              originalId: String(originalId), // 컬럼 동기화(B-H4b)
               rarity: item.rarity,
               // weaponType/role은 String 컬럼. 일부 게임(엔드필드)은 숫자 코드라 강제 변환(B-H4b 선행 시 노출).
               weaponType:
@@ -109,6 +104,7 @@ export class DataSyncService {
             data: {
               gameId: game.id,
               name: item.name,
+              originalId: String(originalId), // 컬럼 동기화(B-H4b)
               rarity: item.rarity,
               // weaponType/role은 String 컬럼. 일부 게임(엔드필드)은 숫자 코드라 강제 변환(B-H4b 선행 시 노출).
               weaponType:

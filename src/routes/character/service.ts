@@ -62,13 +62,8 @@ export const getCharacterByOriginalId = async (
   originalId: string,
 ) => {
   const result = await prisma.character.findFirst({
-    where: {
-      gameId,
-      metadata: {
-        path: ['originalId'],
-        equals: originalId,
-      },
-    },
+    // 인덱스 컬럼 기반(B-H4b). 기존 JSON-path 스캔 제거.
+    where: { gameId, originalId },
     include: {
       game: true,
       element: true,

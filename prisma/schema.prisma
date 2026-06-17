@@ -141,6 +141,7 @@ model Character {
   path    Element? @relation("CharacterPath", fields: [pathId], references: [id])
   videos  Video[]
 
+  @@unique([gameId, originalId]) // 외부 소스 식별자 기준 upsert/조회 인덱스 (B-H4b)
   @@index([gameId])
   @@index([elementId])
   @@index([pathId])
