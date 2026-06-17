@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { axiosGetWithRetry } from '../../utils/httpRetry';
+import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
 
@@ -57,6 +58,10 @@ export class GenshinBuildScraper extends ScraperBase {
       if (a?.id && a?.route) idToRoute.set(String(a.id), String(a.route));
     }
 
+    // 2.5. genshin.gg 유효 캐릭터 슬러그 집합(목록 페이지 href). route→슬러그 매칭에 사용.
+    const validSlugs = await this.fetchValidSlugs();
+    logger.info(`Loaded ${validSlugs.size} valid genshin.gg slugs.`);
+
     // 3. DB의 genshin 캐릭터 순회
     let characters = await prisma.character.findMany({
       where: { gameId: game.id },
@@ -76,7 +81,8 @@ export class GenshinBuildScraper extends ScraperBase {
       const route = idToRoute.get(originalId);
       if (!originalId || !route) continue;
 
-      const slug = this.toSlug(route);
+      const slug = this.resolveSlug(route, validSlugs);
+      if (!slug) continue; // genshin.gg에 없는 캐릭터(여행자·테스트 유닛 등)
       try {
         const html = await this.fetchGg(slug);
         if (!html) {
@@ -87,18 +93,33 @@ export class GenshinBuildScraper extends ScraperBase {
         const ids = weaponNames
           .map((n) => weaponNameToId.get(this.norm(n)))
           .filter((x): x is string => !!x);
+        const artifacts = await this.parseBestArtifacts(html, slug);
 
-        if (ids.length === 0) continue;
+        if (ids.length === 0 && artifacts.length === 0) continue;
         matched++;
 
         const existingMeta =
           ch.metadata && typeof ch.metadata === 'object'
             ? (ch.metadata as Record<string, any>)
             : {};
+        // 성유물은 프론트 BuildRecommendationView의 비-HSR 경로(listData.relics)가 바로 읽는
+        // 형태로 가공한다: { relics: [{ name, icon(로컬경로), items, desc }] }.
+        const recommendedArtifacts = {
+          relics: artifacts
+            .filter((a) => a.iconUrl)
+            .map((a) => ({
+              name: a.name,
+              icon: a.iconUrl,
+              items: [a.name],
+              desc: a.count ? `${a.count}세트` : '',
+            })),
+        };
+
         const metadata = {
           ...existingMeta,
           originalId,
           recommendedWeapons: ids,
+          recommendedArtifacts,
           recommendedSource: 'genshin.gg',
         };
 
@@ -108,7 +129,7 @@ export class GenshinBuildScraper extends ScraperBase {
           metadata,
         });
         logger.info(
-          `[GI-Build] ${processed}/${characters.length} ${ch.name}: ${ids.length} weapons`,
+          `[GI-Build] ${processed}/${characters.length} ${ch.name}: ${ids.length} weapons, ${artifacts.length} artifacts`,
         );
       } catch (e) {
         ggErrors++;
@@ -161,13 +182,92 @@ export class GenshinBuildScraper extends ScraperBase {
     return Array.from(new Set(names));
   }
 
-  /** Ambr route("Kamisato Ayaka") → genshin.gg 슬러그("kamisato-ayaka"). */
-  private toSlug(route: string): string {
-    return route
-      .toLowerCase()
-      .replace(/['"]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+  /** genshin.gg 캐릭터 목록 페이지에서 유효 슬러그 집합을 수집. */
+  private async fetchValidSlugs(): Promise<Set<string>> {
+    const set = new Set<string>();
+    try {
+      const res = await axiosGetWithRetry<string>(`${GG_BASE}/`, {
+        timeout: 15000,
+        headers: { 'User-Agent': UA },
+        responseType: 'text',
+      });
+      const html = typeof res.data === 'string' ? res.data : '';
+      const re = /href="\/characters\/([a-z0-9-]+)\/?"/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html))) set.add(m[1]);
+    } catch {
+      /* 목록 실패 시 빈 집합 — resolveSlug가 후보 슬러그를 그대로 시도 */
+    }
+    return set;
+  }
+
+  /**
+   * Ambr route("Kamisato Ayaka") → genshin.gg 슬러그.
+   * genshin.gg는 짧은 슬러그(ayaka, hutao, yaemiko, raiden, childe…)를 쓰므로
+   * 여러 후보를 만들어 유효 슬러그 집합과 대조한다. 집합이 비면 하이픈 슬러그로 폴백.
+   */
+  private resolveSlug(route: string, validSlugs: Set<string>): string | null {
+    const lower = route.toLowerCase().replace(/['".]/g, '');
+    const words = lower.split(/\s+/).filter(Boolean);
+    const squish = lower.replace(/[^a-z0-9]/g, ''); // "hu tao"→"hutao", "yae miko"→"yaemiko"
+    const hyphen = lower.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const last = words[words.length - 1] || squish;
+    const first = words[0] || squish;
+    // 불규칙 별칭(genshin.gg 고유 명칭)
+    const ALIAS: Record<string, string> = {
+      tartaglia: 'childe',
+      'raiden shogun': 'raiden',
+      'yae miko': 'yaemiko',
+      'kuki shinobu': 'kukishinobu',
+      'hu tao': 'hutao',
+    };
+    const aliasKey = ALIAS[lower];
+
+    const candidates = [aliasKey, squish, last, first, hyphen].filter(
+      (c): c is string => !!c,
+    );
+    if (validSlugs.size === 0) return hyphen || null;
+    for (const c of candidates) {
+      if (validSlugs.has(c)) return c;
+    }
+    return null;
+  }
+
+  /** "Best Artifacts" 섹션: 세트명 + 개수(4/2) + 아이콘(다운로드). */
+  private async parseBestArtifacts(
+    html: string,
+    slug: string,
+  ): Promise<any[]> {
+    const $ = cheerio.load(html);
+    const out: any[] = [];
+    const seen = new Set<string>();
+    const sections = $('.character-build-section').toArray();
+    for (const sec of sections) {
+      const title = $(sec).find('.character-build-section-title').text();
+      if (!/Best Artifacts/i.test(title)) continue;
+      const els = $(sec).find('.character-build-weapon').toArray();
+      for (const el of els) {
+        const name = $(el).find('.character-build-weapon-name').text().trim();
+        const count = $(el).find('.character-build-weapon-count').text().trim();
+        const iconSrc = $(el).find('.character-build-weapon-icon').attr('src');
+        if (!name) continue;
+        const key = `${name}_${count}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let iconUrl: string | null = null;
+        if (iconSrc) {
+          const fileName = `artifact_${this.norm(name)}`;
+          iconUrl = await ImageDownloader.downloadAndSave(
+            iconSrc,
+            'genshin',
+            'artifact',
+            fileName,
+          ).catch(() => null);
+        }
+        out.push({ name, count: count || null, iconUrl });
+      }
+    }
+    return out;
   }
 
   /** 이름 정규화(매핑 키): 소문자 + 영숫자만. "Primordial Jade Winged-Spear" 류 일치 향상. */
