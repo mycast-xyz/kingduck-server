@@ -134,13 +134,6 @@ export class WutheringWavesWeaponScraper extends ScraperBase {
         });
       }
 
-      const fs = require('fs');
-      fs.writeFileSync(
-        'final_weapon_test.json',
-        JSON.stringify(results, null, 2),
-      );
-      logger.info('Saved final test results to final_weapon_test.json');
-
       return results;
     } catch (e) {
       logger.error('Error scraping Wuthering Waves weapons:', e);
