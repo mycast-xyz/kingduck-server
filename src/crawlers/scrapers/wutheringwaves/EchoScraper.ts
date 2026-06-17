@@ -133,6 +133,7 @@ export class WutheringWavesEchoScraper extends ScraperBase {
               gameId: item.gameId,
               name: item.name,
               type: item.type || 'Echo',
+              originalId: originalId != null ? String(originalId) : null, // 컬럼 동기화(B-H4b)
               rarity: item.rarity,
               description: item.description,
               imageUrl: item.imageUrl,

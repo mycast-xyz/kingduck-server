@@ -283,6 +283,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
             gameId: game.id,
             name: item.name,
             type: item.type,
+            originalId: String(originalId), // 컬럼 동기화(B-H4b)
             rarity: item.rarity,
             description: item.description,
             imageUrl: item.imageUrl,
@@ -296,6 +297,7 @@ export class EndfieldEquipmentScraper extends ScraperBase {
           where: { id: existing.id },
           data: {
             name: item.name,
+            originalId: String(originalId), // 컬럼 동기화(B-H4b)
             rarity: item.rarity,
             description: item.description,
             imageUrl: item.imageUrl,

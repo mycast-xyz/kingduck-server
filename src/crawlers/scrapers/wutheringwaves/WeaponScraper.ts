@@ -177,6 +177,7 @@ export class WutheringWavesWeaponScraper extends ScraperBase {
               gameId: item.gameId,
               name: item.name,
               type: item.type || 'Weapon',
+              originalId: originalId != null ? String(originalId) : null, // 컬럼 동기화(B-H4b)
               rarity: item.rarity,
               description: item.description,
               imageUrl: item.imageUrl,
