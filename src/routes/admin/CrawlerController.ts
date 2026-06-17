@@ -54,9 +54,31 @@ export class CrawlerController {
       const gameIdMap = new Map<string, number>();
       games.forEach((g) => gameIdMap.set(g.slug, g.id));
 
-      // 3. 상태 조회 및 데이터 병합
-      const statusList = await Promise.all(
-        slugs.map(async (gameSlug) => {
+      // N+1 방지(B-H5): (game,type)별 findFirst 대신 대상 게임 로그를 한 번에 조회하고
+      // startTime 내림차순에서 (gameId,type)별 첫(=최신) 항목만 Map에 남긴다.
+      const gameIds = Array.from(gameIdMap.values());
+      const allLogs = gameIds.length
+        ? await prisma.crawlerLog.findMany({
+            where: { gameId: { in: gameIds } },
+            orderBy: { startTime: 'desc' },
+            select: {
+              gameId: true,
+              crawlerType: true,
+              startTime: true,
+              status: true,
+              itemsFound: true,
+              errorMsg: true,
+            },
+          })
+        : [];
+      const latestLogMap = new Map<string, (typeof allLogs)[number]>();
+      for (const log of allLogs) {
+        const key = `${log.gameId}:${log.crawlerType}`;
+        if (!latestLogMap.has(key)) latestLogMap.set(key, log);
+      }
+
+      // 3. 상태 조회 및 데이터 병합 (위 Map 기반, per-type 쿼리 없음)
+      const statusList = slugs.map((gameSlug) => {
           const gameId = gameIdMap.get(gameSlug);
           const crawlerTypes = Array.from(gamesMap.get(gameSlug) || []);
           const gameName =
@@ -84,28 +106,19 @@ export class CrawlerController {
             };
           }
 
-          const crawlers = await Promise.all(
-            crawlerTypes.map(async (type) => {
-              const latest = await prisma.crawlerLog.findFirst({
-                where: {
-                  gameId: gameId,
-                  crawlerType: type,
-                },
-                orderBy: { startTime: 'desc' },
-              });
-
-              const disabled = disabledMap.get(`${gameSlug}:${type}`);
-              return {
-                type,
-                lastRun: latest?.startTime || null,
-                status: latest?.status || null, // RUNNING, SUCCESS, FAILED
-                itemsFound: latest?.itemsFound || 0,
-                errorMsg: latest?.errorMsg || null,
-                enabled: disabled ? false : true,
-                disabledReason: disabled?.reason || null,
-              };
-            }),
-          );
+          const crawlers = crawlerTypes.map((type) => {
+            const latest = latestLogMap.get(`${gameId}:${type}`);
+            const disabled = disabledMap.get(`${gameSlug}:${type}`);
+            return {
+              type,
+              lastRun: latest?.startTime || null,
+              status: latest?.status || null, // RUNNING, SUCCESS, FAILED
+              itemsFound: latest?.itemsFound || 0,
+              errorMsg: latest?.errorMsg || null,
+              enabled: disabled ? false : true,
+              disabledReason: disabled?.reason || null,
+            };
+          });
 
           return {
             gameId,
@@ -113,8 +126,7 @@ export class CrawlerController {
             gameName,
             crawlers,
           };
-        }),
-      );
+        });
 
       res.status(200).json({
         resultCode: 200,

@@ -24,27 +24,30 @@ export class AdminController {
         orderBy: { id: 'asc' },
       });
 
-      const gameList = await Promise.all(
-        games.map(async (game) => {
-          const [characterCount, itemCount, typeCount] = await Promise.all([
-            prisma.character.count({ where: { gameId: game.id } }),
-            prisma.item.count({ where: { gameId: game.id } }),
-            prisma.element.count({ where: { gameId: game.id } }),
-          ]);
+      // N+1 방지(B-H5): 게임마다 count 3회 대신 groupBy 집계 3회로 일괄 조회.
+      const [charCounts, itemCounts, elemCounts] = await Promise.all([
+        prisma.character.groupBy({ by: ['gameId'], _count: { _all: true } }),
+        prisma.item.groupBy({ by: ['gameId'], _count: { _all: true } }),
+        prisma.element.groupBy({ by: ['gameId'], _count: { _all: true } }),
+      ]);
+      const toCountMap = (
+        rows: { gameId: number; _count: { _all: number } }[],
+      ) => new Map(rows.map((r) => [r.gameId, r._count._all]));
+      const charMap = toCountMap(charCounts);
+      const itemMap = toCountMap(itemCounts);
+      const elemMap = toCountMap(elemCounts);
 
-          return {
-            id: game.id,
-            slug: game.slug,
-            name: game.name,
-            iconUrl: game.iconUrl,
-            counts: {
-              characters: characterCount,
-              items: itemCount,
-              types: typeCount,
-            },
-          };
-        }),
-      );
+      const gameList = games.map((game) => ({
+        id: game.id,
+        slug: game.slug,
+        name: game.name,
+        iconUrl: game.iconUrl,
+        counts: {
+          characters: charMap.get(game.id) ?? 0,
+          items: itemMap.get(game.id) ?? 0,
+          types: elemMap.get(game.id) ?? 0,
+        },
+      }));
 
       res.status(200).json({
         resultCode: 200,
