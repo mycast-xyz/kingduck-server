@@ -253,6 +253,11 @@ export class GenshinEventScraper extends ScraperBase {
 
     if (typeof content !== 'string') return;
 
+    // genshin 버전 라벨 추출(예: "「일곱 번째 달」"). 없으면 제목 앞부분으로 폴백.
+    const versionLabel =
+      (subject.match(/「([^」]*번째\s*달[^」]*)」/) || [])[1] ||
+      subject.split(' ')[0];
+
     // 1. Maintenance Time
     const updateTimeRegex =
       /(\d{4}\/\d{2}\/\d{2}\s\d{2}:\d{2})\s?\(UTC\+8\).*?(\d+)시간/;
@@ -275,7 +280,7 @@ export class GenshinEventScraper extends ScraperBase {
       await this.upsertEvent({
         gameId,
         type: EventType.MAINTENANCE,
-        title: `v${subject.split(' ')[0]} 점검`,
+        title: `${versionLabel} 버전 점검`,
         startTime: maintainStartTime,
         endTime: updateEndTime,
         officialLink: `https://www.hoyolab.com/article/${post.post_id}`,
@@ -284,6 +289,29 @@ export class GenshinEventScraper extends ScraperBase {
           description: `업데이트 점검 (예상 소요 ${durationHours}시간)`,
           original_subject: subject,
           source_id: post.post_id,
+        },
+      });
+
+      // 버전 기간 이벤트 — genshin 가챠 워프 일정은 HoYoLab 피드에 날짜로 들어있지 않다(별도
+      // 이벤트 공지 글에 존재, 이 피드엔 '이벤트 워프' 글이 없음). 현재 버전을 캘린더에 노출하기
+      // 위해 버전 기간을 이벤트로 등록한다. 종료일은 genshin 버전 주기(약 6주=42일)로 추정한다.
+      const versionStart = updateEndTime || maintainStartTime;
+      const versionEnd = new Date(
+        versionStart.getTime() + 42 * 24 * 60 * 60 * 1000,
+      );
+      await this.upsertEvent({
+        gameId,
+        type: EventType.EVENT,
+        title: `${versionLabel} 버전`,
+        startTime: versionStart,
+        endTime: versionEnd,
+        officialLink: `https://www.hoyolab.com/article/${post.post_id}`,
+        targetId: `${post.post_id}_VERSION`,
+        metadata: {
+          description: `${versionLabel} 버전 기간 (종료일은 추정치)`,
+          original_subject: subject,
+          source_id: post.post_id,
+          estimated_end: true,
         },
       });
     }
