@@ -3,6 +3,7 @@ import { GenshinWeaponScraper } from './scrapers/genshin/weapon';
 import { GenshinMaterialScraper } from './scrapers/genshin/material';
 import { GenshinYoutubeShortsScraper } from './scrapers/genshin/YoutubeShortsScraper';
 import { GenshinEventScraper } from './scrapers/genshin/EventScraper';
+import { GenshinBuildScraper } from './scrapers/genshin/BuildScraper';
 import { CharacterScraper as StarRailCharacterScraper } from './scrapers/starrail/CharacterScraper';
 import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrail/LightConeScraper';
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
@@ -92,6 +93,16 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new GenshinYoutubeShortsScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('genshin', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'genshin',
+    type: 'build', // 추천 무기(궁합) — genshin.gg 큐레이션
+    run: async (s) => {
+      const scraper = new GenshinBuildScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('genshin', data);
       return data.length;
     },
   },
