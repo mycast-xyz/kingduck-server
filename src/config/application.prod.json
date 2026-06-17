@@ -1,23 +1,5 @@
 {
   "APP_ID": "KingDuckServer",
   "LOG_LEVER": "debug",
-  "port": 3000,
-  "db_server": {
-    "user": "user",
-    "password": "",
-    "database": "test",
-    "host": "127.0.0.1",
-    "port": "5432",
-    "dialect": "postgres",
-    "pool": {
-      "max": 5,
-      "min": 0,
-      "acquire": 30000,
-      "idle": 10000
-    }
-  },
-  "redis_server": {
-    "port": 6379,
-    "host": "localhost"
-  }
+  "port": 3000
 }
