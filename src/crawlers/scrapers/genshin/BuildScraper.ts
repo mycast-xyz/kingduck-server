@@ -54,9 +54,21 @@ export class GenshinBuildScraper extends ScraperBase {
     });
     const aItems = aRes.data?.data?.items || {};
     const idToRoute = new Map<string, string>();
+    // 팀 멤버(영문 표시명) → originalId. route와 name 둘 다 키로 등록(매칭률↑).
+    const nameToId = new Map<string, string>();
     for (const a of Object.values<any>(aItems)) {
       if (a?.id && a?.route) idToRoute.set(String(a.id), String(a.route));
+      if (a?.id) {
+        if (a.route) nameToId.set(this.norm(a.route), String(a.id));
+        if (a.name) nameToId.set(this.norm(a.name), String(a.id));
+      }
     }
+    // genshin.gg 고유 표시명 별칭(영문) → Ambr 명칭으로 보정
+    const NAME_ALIAS: Record<string, string> = {
+      childe: 'tartaglia',
+      xianyun: 'cloudretainer',
+      yaemiko: 'yaemiko',
+    };
 
     // 2.5. genshin.gg 유효 캐릭터 슬러그 집합(목록 페이지 href). route→슬러그 매칭에 사용.
     const validSlugs = await this.fetchValidSlugs();
@@ -94,8 +106,10 @@ export class GenshinBuildScraper extends ScraperBase {
           .map((n) => weaponNameToId.get(this.norm(n)))
           .filter((x): x is string => !!x);
         const artifacts = await this.parseBestArtifacts(html, slug);
+        const teams = this.parseTeams(html, nameToId, NAME_ALIAS);
 
-        if (ids.length === 0 && artifacts.length === 0) continue;
+        if (ids.length === 0 && artifacts.length === 0 && teams.length === 0)
+          continue;
         matched++;
 
         const existingMeta =
@@ -120,6 +134,7 @@ export class GenshinBuildScraper extends ScraperBase {
           originalId,
           recommendedWeapons: ids,
           recommendedArtifacts,
+          teams,
           recommendedSource: 'genshin.gg',
         };
 
@@ -129,7 +144,7 @@ export class GenshinBuildScraper extends ScraperBase {
           metadata,
         });
         logger.info(
-          `[GI-Build] ${processed}/${characters.length} ${ch.name}: ${ids.length} weapons, ${artifacts.length} artifacts`,
+          `[GI-Build] ${processed}/${characters.length} ${ch.name}: ${ids.length} weapons, ${artifacts.length} artifacts, ${teams.length} teams`,
         );
       } catch (e) {
         ggErrors++;
@@ -231,6 +246,51 @@ export class GenshinBuildScraper extends ScraperBase {
       if (validSlugs.has(c)) return c;
     }
     return null;
+  }
+
+  /**
+   * "Best {Char} Teams" 섹션 → TeamRecommendationView가 읽는 형태.
+   *   [{ name, slots: [{ main: originalId, backups: [] }] }]
+   * 멤버 img alt에는 캐릭터명과 원소명(Anemo/Pyro…)이 교차하므로 원소명을 걸러낸다.
+   */
+  private parseTeams(
+    html: string,
+    nameToId: Map<string, string>,
+    nameAlias: Record<string, string>,
+  ): any[] {
+    const $ = cheerio.load(html);
+    const ELEMENTS = new Set([
+      'anemo',
+      'geo',
+      'pyro',
+      'hydro',
+      'electro',
+      'cryo',
+      'dendro',
+      'physical',
+    ]);
+    const teams: any[] = [];
+    $('.character-teams .character-team').each((_, t) => {
+      const name = $(t).find('.character-team-name').text().trim();
+      const memberIds: string[] = [];
+      $(t)
+        .find('.character-team-characters [alt]')
+        .each((_i, el) => {
+          const alt = ($(el).attr('alt') || '').trim();
+          if (!alt) return;
+          const key = this.norm(alt);
+          if (ELEMENTS.has(key)) return;
+          const id = nameToId.get(key) || nameToId.get(nameAlias[key] || '');
+          if (id && !memberIds.includes(id)) memberIds.push(id);
+        });
+      if (memberIds.length > 0) {
+        teams.push({
+          name,
+          slots: memberIds.map((id) => ({ main: id, backups: [] })),
+        });
+      }
+    });
+    return teams;
   }
 
   /** "Best Artifacts" 섹션: 세트명 + 개수(4/2) + 아이콘(다운로드). */
