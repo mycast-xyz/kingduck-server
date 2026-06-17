@@ -1,4 +1,8 @@
 import { GenshinCharacterScraper } from './scrapers/genshin/character';
+import { GenshinWeaponScraper } from './scrapers/genshin/weapon';
+import { GenshinMaterialScraper } from './scrapers/genshin/material';
+import { GenshinYoutubeShortsScraper } from './scrapers/genshin/YoutubeShortsScraper';
+import { GenshinEventScraper } from './scrapers/genshin/EventScraper';
 import { CharacterScraper as StarRailCharacterScraper } from './scrapers/starrail/CharacterScraper';
 import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrail/LightConeScraper';
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
@@ -40,15 +44,57 @@ export type ScraperTask = {
 // Define all tasks
 export const CRAWLER_TASKS: ScraperTask[] = [
   // --- Genshin Impact ---
-  // {
-  //   game: 'genshin',
-  //   type: 'character',
-  //   run: async (s) => {
-  //     const scraper = new GenshinCharacterScraper('genshin');
-  //     const data = await scraper.scrape();
-  //     if (data.length > 0) await s.syncCharacters('genshin', data);
-  //   },
-  // },
+  // 캐릭터: Ambr(gi.yatta.moe) 공개 API 소스. 기획: ../docs/CRAWLER_SOURCE_MIGRATION_PLAN.md (과제 3)
+  {
+    game: 'genshin',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new GenshinCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('genshin', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'genshin',
+    type: 'weapon',
+    run: async (s) => {
+      const scraper = new GenshinWeaponScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('genshin', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'genshin',
+    type: 'item', // General materials
+    run: async (s) => {
+      const scraper = new GenshinMaterialScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('genshin', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'genshin',
+    type: 'event',
+    run: async (s) => {
+      const scraper = new GenshinEventScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+  {
+    game: 'genshin',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new GenshinYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('genshin', data);
+      return data.length;
+    },
+  },
 
   // --- Honkai: Star Rail ---
   // character / item(LightCone) / relic 3종은 hakush 소실 → starrailstation.com(PAGE_CONFIG)으로

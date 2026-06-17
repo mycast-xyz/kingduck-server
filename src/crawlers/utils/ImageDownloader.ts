@@ -29,7 +29,7 @@ export class ImageDownloader {
       referer: 'https://hsr20.hakush.in/',
     },
     genshin: {
-      referer: 'https://genshin.honeyhunterworld.com/',
+      referer: 'https://gi.yatta.moe/',
     },
     zzz: {
       referer: 'https://zenless.gg/',
