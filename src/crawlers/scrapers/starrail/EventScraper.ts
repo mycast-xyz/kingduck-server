@@ -23,8 +23,8 @@ export class EventScraper extends ScraperBase {
     });
 
     if (!game) {
-      logger.error(`Game ${this.gameSlug} not found in database.`);
-      return [];
+      // 실패를 SUCCESS/0건으로 위장하지 않는다 (B-H6)
+      throw new Error(`Game ${this.gameSlug} not found in database.`);
     }
 
     const results: ScrapedData[] = [];
@@ -40,8 +40,8 @@ export class EventScraper extends ScraperBase {
       });
 
       if (response.data.retcode !== 0) {
-        logger.error(`API Error: ${response.data.message}`);
-        return [];
+        // API 오류를 SUCCESS/0건으로 위장하지 않는다 (B-H6)
+        throw new Error(`Star Rail event API error: ${response.data.message}`);
       }
 
       const list = response.data.data.list;
@@ -86,6 +86,8 @@ export class EventScraper extends ScraperBase {
       }
     } catch (err) {
       logger.error('Error during scraping', err);
+      // 빈 배열로 삼키면 스케줄러가 SUCCESS/0건으로 기록한다 → 실패를 표면화 (B-H6)
+      throw err;
     }
 
     return results;

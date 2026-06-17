@@ -59,8 +59,8 @@ export class EventScraper extends ScraperBase {
     });
 
     if (!game) {
-      logger.error(`Game ${this.gameSlug} not found in database.`);
-      return [];
+      // 실패를 SUCCESS/0건으로 위장하지 않는다 (B-H6)
+      throw new Error(`Game ${this.gameSlug} not found in database.`);
     }
 
     const results: ScrapedData[] = [];
@@ -68,11 +68,11 @@ export class EventScraper extends ScraperBase {
     try {
       // Read parsed events from JSON file
       if (!fs.existsSync(this.PARSED_EVENTS_PATH)) {
-        logger.error(
+        logger.info('Please run: npx tsx scripts/parse_wuthering_events.ts');
+        // 필수 입력 파일 부재를 SUCCESS/0건으로 위장하지 않는다 (B-H6)
+        throw new Error(
           `Parsed events file not found: ${this.PARSED_EVENTS_PATH}`,
         );
-        logger.info('Please run: npx tsx scripts/parse_wuthering_events.ts');
-        return [];
       }
 
       const rawData = fs.readFileSync(this.PARSED_EVENTS_PATH, 'utf-8');
@@ -96,6 +96,8 @@ export class EventScraper extends ScraperBase {
       );
     } catch (err) {
       logger.error('Error during scraping parsed_events.json', err);
+      // 필수 events 처리 실패는 표면화 (B-H6). (updates는 선택적이라 아래에서 관대 처리)
+      throw err;
     }
 
     // Also process parsed_updates.json
