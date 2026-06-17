@@ -23,12 +23,23 @@ export class CrawlerController {
     try {
       // 1. CRAWLER_TASKS를 기반으로 게임별 크롤러 목록 구성
       const gamesMap = new Map<string, Set<string>>();
+      // 동결 상태 조회용: `${game}:${type}` → { enabled, reason }
+      const disabledMap = new Map<
+        string,
+        { enabled: boolean; reason?: string }
+      >();
 
       CRAWLER_TASKS.forEach((task) => {
         if (!gamesMap.has(task.game)) {
           gamesMap.set(task.game, new Set());
         }
         gamesMap.get(task.game)?.add(task.type);
+        if (task.enabled === false) {
+          disabledMap.set(`${task.game}:${task.type}`, {
+            enabled: false,
+            reason: task.disabledReason,
+          });
+        }
       });
 
       // 2. DB에서 게임 정보 조회 (ID 매핑용)
@@ -58,13 +69,18 @@ export class CrawlerController {
             return {
               gameSlug,
               gameName,
-              crawlers: crawlerTypes.map((type) => ({
-                type,
-                lastRun: null,
-                status: null,
-                itemsFound: 0,
-                errorMsg: 'Game not found in DB',
-              })),
+              crawlers: crawlerTypes.map((type) => {
+                const disabled = disabledMap.get(`${gameSlug}:${type}`);
+                return {
+                  type,
+                  lastRun: null,
+                  status: null,
+                  itemsFound: 0,
+                  errorMsg: 'Game not found in DB',
+                  enabled: disabled ? false : true,
+                  disabledReason: disabled?.reason || null,
+                };
+              }),
             };
           }
 
@@ -78,12 +94,15 @@ export class CrawlerController {
                 orderBy: { startTime: 'desc' },
               });
 
+              const disabled = disabledMap.get(`${gameSlug}:${type}`);
               return {
                 type,
                 lastRun: latest?.startTime || null,
                 status: latest?.status || null, // RUNNING, SUCCESS, FAILED
                 itemsFound: latest?.itemsFound || 0,
                 errorMsg: latest?.errorMsg || null,
+                enabled: disabled ? false : true,
+                disabledReason: disabled?.reason || null,
               };
             }),
           );
@@ -103,7 +122,7 @@ export class CrawlerController {
         data: statusList,
       });
     } catch (error) {
-      console.error('getStatus Error:', error);
+      logger.error('getStatus Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -157,7 +176,7 @@ export class CrawlerController {
         },
       });
     } catch (error) {
-      console.error('getLogs Error:', error);
+      logger.error('getLogs Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -190,6 +209,16 @@ export class CrawlerController {
         res.status(400).json({
           resultCode: 400,
           resultMsg: '지원하지 않는 크롤러입니다.',
+        });
+        return;
+      }
+
+      // 동결(freeze)된 크롤러는 수동 실행도 거부 — 죽은 소스로 인한 에러 방지.
+      if (task.enabled === false) {
+        res.status(423).json({
+          resultCode: 423,
+          resultMsg:
+            task.disabledReason || '현재 비활성화된 크롤러입니다. (동결)',
         });
         return;
       }
@@ -282,7 +311,7 @@ export class CrawlerController {
         },
       });
     } catch (error) {
-      console.error('runCrawler Error:', error);
+      logger.error('runCrawler Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -327,7 +356,7 @@ export class CrawlerController {
         data: log,
       });
     } catch (error) {
-      console.error('getRunStatus Error:', error);
+      logger.error('getRunStatus Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',

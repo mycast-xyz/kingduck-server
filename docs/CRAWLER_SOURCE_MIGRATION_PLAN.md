@@ -1,9 +1,23 @@
 # 크롤러 데이터 소스 마이그레이션 기획안
 
-작성일: 2026-06-16 · 대상: `src/crawlers` · 상태: **기획(미착수)**
+작성일: 2026-06-16 · 대상: `src/crawlers` · 상태: **일부 착수**
 
 > 2026-06-16 크롤링 전수 점검 중 발견한 **2건의 장애**에 대한 처리 기획안.
 > 실제 크롤 실행으로 재현·검증한 결과를 바탕으로 한다.
+
+## 진행 이력
+
+- **2026-06-17 · 과제 2(endfield item type) 완료** (`61b517f`): `DataSyncService.ts`의 `itemType`을 `String(... ?? 'Unknown')`로 강제. 95건 sync 차단 해소.
+- **2026-06-17 · 과제 1 동결(1.0-B) 완료**: `scheduler.ts`의 starrail character/item(LightCone)/relic/item(general) 4개 태스크에 `enabled:false`+`disabledReason` 부여. 스케줄러 루프·수동 실행(`CrawlerController.runCrawler` → 423) 모두 스킵, `getStatus`에 `enabled/disabledReason` 노출. 기존 DB(캐릭터 86 / 아이템 1740) 그대로 서빙, 에러·로그 스팸 중단. redeem/event/video는 유지.
+  - 실측 재확인(2026-06-17): hakush `000`(연결 불가, 죽음 확정) · starrailstation `/kr/characters`·`/kr/equipment` 200 + `PAGE_CONFIG` 임베드 → 마이그레이션(A) 소스 생존.
+  - **DB 백업 완료**: `backups/game_<timestamp>.dump` (pg_dump -Fc, native PG14@5432/`game`). `backups/` gitignore 추가.
+- **2026-06-17 · 과제 1 마이그레이션(A) 완료** — starrailstation.com(PAGE_CONFIG) 단독 소스로 전환:
+  - 공용 util `src/crawlers/utils/srsPageConfig.ts` (fetchPageConfig: 마커 탐색+중괄호 매칭 파싱, 실패 시 throw / srsAssetUrl / 한→영 속성·운명 매핑). 4개 스크래퍼 공유.
+  - **CharacterScraper**: `/kr/characters`→`/kr/character/{pageId}`. 출력 metadata를 프론트 계약대로 재현(element/path는 **영문 키**로 역매핑 — 필터·elements 호환; skills/ranks_raw(Id·Desc·ParamList)/skill_tree/stats(인덱스 객체 HPBase..Cost)/eidolons/voiceLines/stories). SRS 미제공 추천필드(teams/lightcones/relics)는 **기존 metadata merge로 보존**.
+  - **LightConeScraper**: `/kr/equipment`→`/kr/lightcone/{pageId}`. refinements/stats 재현, path 영문화.
+  - **RelicScraper**: hakush 완전 제거, `/kr/relics`(+`/{id}`) 단독. 2pc/4pc·parts·이미지 SRS에서 직접.
+  - **검증(실 크롤+sync)**: characters 92(기존 86+신규 6, 0 err) · LightCone 162(+6) · RelicSet 58(54 갱신+4 신규). originalId 매칭으로 중복 없음, elements 한국어 중복 0(필터 무결), 기존 캐릭터 teams 보존 확인. `tsc --noEmit` 0.
+  - **동결 현황**: 일반 item(Material/Usable/Mission/Virtual ≈1530)만 동결 유지(SRS 독립 재료 소스 없음 — 사용자 결정). 기존 DB 데이터 그대로 서빙.
 
 ---
 

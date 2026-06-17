@@ -144,3 +144,6 @@ logs/
 
 # test-images directory
 **/test-images/
+
+# DB backups (pg_dump)
+backups/

@@ -1,275 +1,307 @@
-import axios from 'axios';
-import fs from 'fs';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import {
+  fetchPageConfig,
+  srsAssetUrl,
+  SRS_BASE,
+  mapDamageTypeToEn,
+  mapPathToEn,
+} from '../../utils/srsPageConfig';
 
+/**
+ * 캐릭터 스크래퍼 — starrailstation.com 소스.
+ *
+ * 기존 hakush(api.hakush.in) 소스가 소실되어 SRS PAGE_CONFIG로 교체.
+ * 출력 metadata는 hakush 시절 키를 그대로 유지해 프론트(HonkaiStarRailInit 레이아웃)와 호환:
+ *   element/path(영문 키), skills, ranks_raw, eidolons, stats(인덱스 객체), skill_tree/skillTrees,
+ *   voiceLines, stories, camp, cardImageUrl, originalId 등.
+ *
+ * 중요 1) element/path는 프론트 필터가 **영문 키**(Fire/Warlock…)로 매칭하므로, SRS의 한국어
+ *   이름(화염/공허…)을 영문으로 역매핑한다(아래 맵). 안 그러면 elements 중복 생성 + 필터 깨짐.
+ * 중요 2) SRS가 제공하지 않는 추천 필드(teams/lightcones/relics)는 기존 DB metadata를 **merge로 보존**.
+ *
+ * - 목록: https://starrailstation.com/kr/characters  (entries: rankKey=인게임ID=originalId, pageId=상세슬러그)
+ * - 상세: https://starrailstation.com/kr/character/{pageId}
+ */
 export class CharacterScraper extends ScraperBase {
-  private readonly LIST_API_URL =
-    'https://api.hakush.in/hsr/data/character.json';
-  private readonly DETAIL_API_BASE =
-    'https://api.hakush.in/hsr/data/kr/character';
+  private readonly LIST_URL = `${SRS_BASE}/kr/characters`;
+  private readonly DETAIL_BASE = `${SRS_BASE}/kr/character`;
 
   constructor() {
     super('starrail');
   }
 
   async scrape(limit?: number): Promise<ScrapedData[]> {
-    logger.info('Starting Star Rail Character scraping (API mode)...');
+    logger.info('Starting Star Rail Character scraping (StarRailStation)...');
     const results: ScrapedData[] = [];
 
-    try {
-      // 1. Fetch List
-      const { data: charMap } = await axios.get(this.LIST_API_URL, { timeout: 15000 });
-      // charMap is object { id: { ...basic info } }
-      let charIds = Object.keys(charMap);
-
-      if (limit) {
-        charIds = charIds.slice(0, limit);
-      }
-
-      logger.info(`Found ${charIds.length} characters.`);
-
-      let processedCount = 0;
-      const totalCount = charIds.length;
-
-      for (const id of charIds) {
-        processedCount++;
-        logger.info(
-          `[SR-Char] Processing character ${processedCount}/${totalCount} (ID: ${id}) - ${((processedCount / totalCount) * 100).toFixed(1)}%`,
-        );
-        try {
-          // 2. Fetch Detail
-          const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
-          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
-
-          // DEBUG: Save first character JSON
-          if (results.length === 0) {
-            fs.writeFileSync(
-              'starrail_character_sample.json',
-              JSON.stringify(detail, null, 2),
-            );
-            logger.info(
-              'Saved sample character JSON to starrail_character_sample.json',
-            );
-          }
-
-          // Basic info from detail or map
-          // detail.Name is the localized character name from Korean API
-          let name = detail.Name || charMap[id].kr || `Char_${id}`;
-
-          // Parse rarity from "CombatPowerAvatarRarityType4" -> 4
-          let rarity = 4; // default
-          if (detail.Rarity && typeof detail.Rarity === 'string') {
-            const match = detail.Rarity.match(/Type(\d+)/);
-            if (match) {
-              rarity = parseInt(match[1]);
-            }
-          }
-
-          // 3. Images as per updated requirement:
-          // List Icon: https://api.hakush.in/hsr/UI/avatarshopicon/{id}.webp
-          const iconRemoteUrl = `https://api.hakush.in/hsr/UI/avatarshopicon/${id}.webp`;
-          const localIconUrl = await ImageDownloader.downloadAndSave(
-            iconRemoteUrl,
-            'starrail',
-            'character',
-            `icon_${id}`,
-          );
-
-          // Card Image: https://api.hakush.in/hsr/UI/avatardrawcard/{id}.webp
-          const cardRemoteUrl = `https://api.hakush.in/hsr/UI/avatardrawcard/${id}.webp`;
-          const localCardUrl = await ImageDownloader.downloadAndSave(
-            cardRemoteUrl,
-            'starrail',
-            'character',
-            `card_${id}`,
-          );
-
-          results.push({
-            name: name,
-            sourceUrl: detailUrl,
-            imageUrl: localIconUrl, // Main icon
-            rarity: rarity, // Use parsed rarity
-            weaponType: detail.BaseType,
-            role: detail.Role,
-            description: detail.Desc,
-            metadata: {
-              originalId: id,
-              cardImageUrl: localCardUrl,
-              rarity: rarity,
-              element: detail.DamageType,
-              path: detail.BaseType,
-              camp: detail.CharaInfo?.Camp,
-              stats: detail.Stats, // Base stats (HP, ATK, DEF, Speed, etc.)
-              promotions: detail.Promotions, // Ascension stats map
-              stories: detail.CharaInfo?.Stories, // Background stories
-              voiceLines: detail.CharaInfo?.Voicelines, // Voice lines
-              skills: await this.processSkills(
-                detail.Skills,
-                detail.SkillTrees,
-              ),
-              eidolons: await this.processEidolons(id, detail.Ranks),
-              skillTrees: this.processSkillTrees(detail.SkillTrees),
-
-              // Raw backups for completeness
-              skills_raw: detail.Skills,
-              ranks_raw: detail.Ranks,
-              promotions_raw: detail.Promotions,
-
-              // Recommendations
-              teams: detail.Teams,
-              gradings: detail.Gradings, // Relics, Lightcones recommendations
-              lightcones: detail.Lightcones,
-              relics: detail.Relics,
-            },
-          });
-        } catch (innerErr) {
-          logger.error(`Failed to process character ${id}:`, innerErr);
-        }
-      }
-    } catch (e) {
-      logger.error('Error scraping Star Rail characters:', e);
+    const game = await prisma.game.findUnique({ where: { slug: 'starrail' } });
+    if (!game) {
+      throw new Error('Star Rail game record not found in database!');
     }
 
-    return results;
-  }
+    // 1. 목록
+    const listConfig = await fetchPageConfig(this.LIST_URL);
+    let entries: any[] = Array.isArray(listConfig.entries)
+      ? listConfig.entries
+      : [];
+    if (entries.length === 0) {
+      throw new Error('Character list has 0 entries (SRS 구조 변경 의심)');
+    }
+    if (limit) entries = entries.slice(0, limit);
+    logger.info(`Found ${entries.length} characters from StarRailStation.`);
 
-  private async processEidolons(charId: string, ranks: any): Promise<any[]> {
-    const eidolons: any[] = [];
-    if (!ranks) return eidolons;
-
-    for (const rankKey of Object.keys(ranks)) {
-      const rankData = ranks[rankKey];
-      // Rank is usually 1-6
-      const rankNum = parseInt(rankKey);
-
-      // Icon URL Pattern: https://api.hakush.in/hsr/UI/rank/_dependencies/textures/{id}/{id}_Rank_{rank}.webp
-      // Note: User example was 1321/1321_Rank_2.webp. Assuming charId is 1321.
-      const iconRemoteUrl = `https://api.hakush.in/hsr/UI/rank/_dependencies/textures/${charId}/${charId}_Rank_${rankNum}.webp`;
-      const localIconUrl = await ImageDownloader.downloadAndSave(
-        iconRemoteUrl,
-        'starrail',
-        'character',
-        `rank_${charId}_${rankNum}`,
+    let processed = 0;
+    let detailErrors = 0;
+    for (const entry of entries) {
+      processed++;
+      const pageId = entry.pageId;
+      const originalId = String(entry.rankKey ?? '');
+      if (!pageId || !originalId) {
+        logger.warn(`Character entry missing pageId/rankKey: ${entry.name}`);
+        continue;
+      }
+      logger.info(
+        `[SR-Char] ${processed}/${entries.length} ${entry.name} (${originalId}) - ${((processed / entries.length) * 100).toFixed(1)}%`,
       );
 
-      eidolons.push({
-        rank: rankNum,
-        name: rankData.Name,
-        desc: rankData.Desc,
-        iconUrl: localIconUrl,
-      });
-    }
-    return eidolons;
-  }
+      try {
+        const detailUrl = `${this.DETAIL_BASE}/${pageId}`;
+        const detail = await fetchPageConfig(detailUrl);
 
-  private async processSkills(skillsMap: any, skillTrees: any): Promise<any[]> {
-    const results: any[] = [];
-    if (!skillsMap) return results;
-
-    const skillIds = Object.keys(skillsMap);
-    for (const skillId of skillIds) {
-      const skill = skillsMap[skillId];
-
-      // Find Icon from SkillTrees
-      let iconFilename = '';
-      if (skillTrees) {
-        for (const treeKey of Object.keys(skillTrees)) {
-          const levelOne = skillTrees[treeKey]['1']; // Level 1 info has the icon
-          if (
-            levelOne &&
-            levelOne.LevelUpSkillID &&
-            levelOne.LevelUpSkillID.includes(parseInt(skillId))
-          ) {
-            iconFilename = levelOne.Icon;
-            break;
-          }
-        }
-      }
-
-      let localIconUrl = '';
-      if (iconFilename) {
-        // Replace .png with .webp
-        const webpFilename = iconFilename.replace('.png', '.webp');
-        // https://api.hakush.in/hsr/UI/skillicons/SkillIcon_1321_Passive.webp
-        const remoteUrl = `https://api.hakush.in/hsr/UI/skillicons/${webpFilename}`;
-        // Save as skill_SkillIcon_...
-        const savedUrl = await ImageDownloader.downloadAndSave(
-          remoteUrl,
-          'starrail',
-          'skill',
-          `skill_${webpFilename.replace('.webp', '')}`,
+        const name = detail.name || entry.name || `Char_${originalId}`;
+        const rarity = detail.rarity ?? entry.rarity ?? 4;
+        const elementEn = mapDamageTypeToEn(
+          detail.damageType?.name || entry.damageType?.name,
         );
-        if (savedUrl) localIconUrl = savedUrl;
-      }
+        const pathEn = mapPathToEn(
+          detail.baseType?.name || entry.baseType?.name,
+        );
 
-      // Extract params (using Level 1 as base)
-      const levelOneParams =
-        skill.Level && skill.Level['1'] ? skill.Level['1'].ParamList : [];
+        // 이미지: 리스트 아이콘 + 카드(스플래시)
+        const localIconUrl = await this.dl(
+          detail.iconPath || entry.iconPath,
+          `icon_${originalId}`,
+        );
+        const localCardUrl = await this.dl(
+          detail.splashIconPath || detail.artPath || detail.figPath,
+          `card_${originalId}`,
+        );
 
-      results.push({
-        id: skillId,
-        type: skill.Type,
-        name: skill.Name,
-        desc: skill.Desc,
-        simpleDesc: skill.SimpleDesc,
-        tag: skill.Tag,
-        iconUrl: localIconUrl,
-        params: levelOneParams,
-      });
-    }
-    return results;
-  }
+        // 가공
+        const skills = await this.processSkills(detail.skills, originalId);
+        const ranks = await this.processRanks(detail.ranks, originalId);
+        const traces = await this.processTraces(
+          detail.skillTreePoints,
+          originalId,
+        );
+        const stats = this.processStats(detail.levelData);
 
-  private processSkillTrees(skillTrees: any): any[] {
-    const results: any[] = [];
-    if (!skillTrees) return results;
+        // SRS가 채우는 필드만 모음(나머지는 기존 metadata 보존)
+        const srsMeta: Record<string, any> = {
+          originalId,
+          rarity,
+          element: elementEn,
+          path: pathEn,
+          camp: detail.archive?.camp,
+          cardImageUrl: localCardUrl,
+          description: detail.descHash,
+          skills,
+          skills_raw: detail.skills,
+          ranks_raw: ranks, // 성혼(RankListView) — Id/name/Desc/ParamList/Image 키
+          eidolons: ranks.map((r) => ({
+            rank: r.Id,
+            name: r.name,
+            desc: r.Desc,
+            iconUrl: r.iconUrl,
+          })),
+          skill_tree: traces, // 행적(TraceListView) 레이아웃 키
+          skillTrees: traces, // 기존 키(파리티)
+          stats,
+          voiceLines: detail.voiceItems,
+          stories: detail.storyItems,
+        };
 
-    // SkillTrees structure: { Point01: { 1: {...}, 2: {...} }, Point02: {...}, ... }
-    for (const anchor of Object.keys(skillTrees)) {
-      const levels = skillTrees[anchor];
+        // 기존 metadata 병합(SRS 미제공 추천 필드 teams/lightcones/relics 보존)
+        const existing = await prisma.character.findFirst({
+          where: {
+            gameId: game.id,
+            metadata: { path: ['originalId'], equals: originalId },
+          },
+          select: { metadata: true },
+        });
+        const existingMeta =
+          existing && existing.metadata && typeof existing.metadata === 'object'
+            ? (existing.metadata as Record<string, any>)
+            : {};
 
-      for (const levelKey of Object.keys(levels)) {
-        const node = levels[levelKey];
-
-        // Extract skill ID if this node upgrades a skill
-        const skillId =
-          node.LevelUpSkillID && node.LevelUpSkillID.length > 0
-            ? node.LevelUpSkillID[0].toString()
-            : null;
-
-        // Extract materials
-        const materials = (node.MaterialList || []).map((mat: any) => ({
-          itemId: mat.ItemID,
-          count: mat.ItemNum,
-          rarity: mat.Rarity,
-        }));
-
-        // Extract stat bonuses
-        const statBonus = (node.StatusAddList || []).map((stat: any) => ({
-          type: stat.PropertyType,
-          value: stat.Value,
-        }));
+        const metadata = { ...existingMeta, ...srsMeta };
 
         results.push({
-          pointId: node.PointID,
-          anchor: anchor,
-          level: parseInt(levelKey),
-          skillId: skillId,
-          maxLevel: node.MaxLevel,
-          icon: node.Icon,
-          unlockPromotion: node.AvatarPromotionLimit,
-          unlockLevel: node.AvatarLevelLimit,
-          defaultUnlock: node.DefaultUnlock,
-          materials: materials,
-          statBonus: statBonus,
-          prePoints: node.PrePoint || [],
+          name,
+          sourceUrl: detailUrl,
+          imageUrl: localIconUrl,
+          rarity,
+          weaponType: pathEn, // hakush 시절 weaponType=BaseType 관행 유지
+          description: detail.descHash,
+          metadata,
         });
+      } catch (innerErr) {
+        detailErrors++;
+        logger.error(`Failed to process character ${pageId}:`, innerErr);
       }
     }
 
+    if (results.length === 0 && detailErrors > 0) {
+      throw new Error(
+        `All ${detailErrors} character detail fetches failed (SRS 장애/구조 변경 의심)`,
+      );
+    }
+    if (detailErrors > 0) {
+      logger.warn(
+        `Character scrape partial: ${results.length} ok / ${detailErrors} failed`,
+      );
+    }
     return results;
+  }
+
+  private async dl(
+    iconPath: string | undefined | null,
+    fileName: string,
+    category = 'character',
+  ): Promise<string | null> {
+    const url = srsAssetUrl(iconPath);
+    if (!url) return null;
+    return ImageDownloader.downloadAndSave(url, 'starrail', category, fileName);
+  }
+
+  /**
+   * 스킬 → 프론트(HsrSkillTreeViewModel) 형태: { id, type, name, desc, iconUrl, params, maxLevel }
+   * params는 최고 레벨치(서술 #N[i]% 치환용 단일 배열).
+   */
+  private async processSkills(skills: any[], charId: string): Promise<any[]> {
+    if (!Array.isArray(skills)) return [];
+    const out: any[] = [];
+    for (const s of skills) {
+      const levelData: any[] = Array.isArray(s.levelData) ? s.levelData : [];
+      const topParams = levelData.length
+        ? levelData[levelData.length - 1].params || []
+        : [];
+      const iconUrl = await this.dl(s.iconPath, `skill_${charId}_${s.id}`, 'skill');
+      out.push({
+        id: s.id,
+        type: s.typeDescHash || null,
+        tag: s.tagHash || null,
+        name: s.name,
+        desc: s.descHash,
+        iconUrl,
+        params: topParams,
+        maxLevel: levelData.length || undefined,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * 성혼(Eidolon) → RankListView 형태: { Id, name, Desc, ParamList, Image, iconUrl }
+   */
+  private async processRanks(ranks: any[], charId: string): Promise<any[]> {
+    if (!Array.isArray(ranks)) return [];
+    const out: any[] = [];
+    for (const r of ranks) {
+      const iconUrl = await this.dl(
+        r.iconPath,
+        `rank_${charId}_${r.id}`,
+        'character',
+      );
+      out.push({
+        Id: r.id,
+        name: r.name,
+        Desc: r.descHash,
+        ParamList: Array.isArray(r.params) ? r.params : [],
+        Image: iconUrl,
+        iconUrl,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * 행적(Trace) 트리 → TraceListView가 읽는 평탄 배열.
+   * - embedBonusSkill 노드(능력): { name, description/Desc, Icon, ParamList }
+   * - embedBuff 노드(스탯강화): { name, Name, Icon, ParamList }
+   */
+  private async processTraces(points: any[], charId: string): Promise<any[]> {
+    if (!Array.isArray(points)) return [];
+    const out: any[] = [];
+
+    const walk = async (node: any) => {
+      if (!node) return;
+      if (node.embedBonusSkill) {
+        const b = node.embedBonusSkill;
+        const icon = await this.dl(
+          b.iconPath,
+          `trace_${charId}_${node.id}`,
+          'skill',
+        );
+        out.push({
+          name: b.name || '',
+          Desc: b.descHash,
+          description: b.descHash,
+          Icon: icon,
+          ParamList: Array.isArray(b.params) ? b.params : [],
+        });
+      } else if (node.embedBuff) {
+        const b = node.embedBuff;
+        const icon = await this.dl(
+          b.iconPath,
+          `trace_${charId}_${node.id}`,
+          'skill',
+        );
+        out.push({
+          name: b.name || '',
+          Name: b.name || '',
+          Icon: icon,
+          ParamList: [],
+        });
+      }
+      if (Array.isArray(node.children)) {
+        for (const c of node.children) await walk(c);
+      }
+    };
+
+    for (const p of points) await walk(p);
+    return out;
+  }
+
+  /**
+   * 승급별 스탯 → 프론트(HsrStatsViewModel) 인덱스 객체.
+   * { "0": { HPBase, HPAdd, AttackBase, AttackAdd, DefenceBase, DefenceAdd,
+   *          SpeedBase, CriticalChance, CriticalDamage, BaseAggro,
+   *          Cost: [{ ItemID, ItemNum }] }, "1": {...}, ... }
+   */
+  private processStats(levelData: any[]): Record<string, any> | null {
+    if (!Array.isArray(levelData) || levelData.length === 0) return null;
+    const stats: Record<string, any> = {};
+    levelData.forEach((d, i) => {
+      stats[String(i)] = {
+        HPBase: d.hpBase,
+        HPAdd: d.hpAdd,
+        AttackBase: d.attackBase,
+        AttackAdd: d.attackAdd,
+        DefenceBase: d.defenseBase,
+        DefenceAdd: d.defenseAdd,
+        SpeedBase: d.speedBase,
+        CriticalChance: d.crate,
+        CriticalDamage: d.cdmg,
+        BaseAggro: d.aggro,
+        Cost: Array.isArray(d.cost)
+          ? d.cost.map((c: any) => ({ ItemID: c.id, ItemNum: c.count }))
+          : [],
+      };
+    });
+    return stats;
   }
 }

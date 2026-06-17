@@ -31,6 +31,10 @@ export type ScraperTask = {
   game: string;
   type: string; // 'character', 'item', 'weapon', 'echo', 'video', etc.
   run: (syncService: DataSyncService) => Promise<number>;
+  // 동결(freeze) 플래그. 외부 데이터 소스 장애 등으로 일시 비활성한 태스크.
+  // 스케줄러 루프와 수동 실행 모두 스킵하고, 기존 DB 데이터를 그대로 서빙한다.
+  enabled?: boolean; // 미지정 시 활성(true)으로 간주
+  disabledReason?: string; // enabled:false일 때 사유(로그/관리자 UI 노출용)
 };
 
 // Define all tasks
@@ -47,6 +51,10 @@ export const CRAWLER_TASKS: ScraperTask[] = [
   // },
 
   // --- Honkai: Star Rail ---
+  // character / item(LightCone) / relic 3종은 hakush 소실 → starrailstation.com(PAGE_CONFIG)으로
+  // 마이그레이션 완료(2026-06-17). 일반 item(general)은 SRS에 독립 재료 목록이 없어 **동결 유지**
+  // (사용자 결정) — 기존 DB의 재료 데이터(약 1530건)는 그대로 서빙된다.
+  // 기획/이력: ../docs/CRAWLER_SOURCE_MIGRATION_PLAN.md (과제 1)
   {
     game: 'starrail',
     type: 'character',
@@ -78,7 +86,10 @@ export const CRAWLER_TASKS: ScraperTask[] = [
   },
   {
     game: 'starrail',
-    type: 'item', // General Items
+    type: 'item', // General Items (Material/Usable/Mission/Virtual)
+    enabled: false,
+    disabledReason:
+      'SRS에 독립 재료 목록 소스 없음 — 동결 유지(기존 DB 재료 서빙). hakush 소실 후속.',
     run: async (s) => {
       const scraper = new StarRailItemScraper();
       const data = await scraper.scrape();
@@ -300,6 +311,15 @@ async function runCrawlers() {
       if (gameFilter && task.game !== gameFilter) continue;
       if (typeFilter && task.type !== typeFilter) continue;
 
+      // 동결(freeze)된 태스크는 스킵 — 죽은 외부 소스로 인한 에러·로그 스팸 방지.
+      if (task.enabled === false) {
+        logger.warn(
+          `>>> Skipping disabled task: [${task.game}] ${task.type}` +
+            (task.disabledReason ? ` — ${task.disabledReason}` : ''),
+        );
+        continue;
+      }
+
       logger.info(`>>> Running task: [${task.game}] ${task.type}`);
       try {
         // Find game ID for logging
@@ -387,7 +407,7 @@ async function runCrawlers() {
 if (require.main === module) {
   runCrawlers().catch((e) => {
     logger.error('Crawler Job Failed', e);
-    console.error('Crawler Job Failed:', e);
+    logger.error('Crawler Job Failed:', e);
   });
 }
 

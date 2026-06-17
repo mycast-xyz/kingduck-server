@@ -1,322 +1,180 @@
-import axios from 'axios';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { fetchPageConfig, srsAssetUrl, SRS_BASE } from '../../utils/srsPageConfig';
 
+/**
+ * 유물(RelicSet) 스크래퍼 — starrailstation.com 단독 소스.
+ *
+ * 기존엔 hakush(구조) + SRS(이미지) 병용이었으나 hakush 소실로 **SRS 단독**으로 전환.
+ * SRS /kr/relics가 세트 이름·세트보너스(2pc/4pc)·파츠·이미지를 모두 제공한다.
+ *
+ * 출력 metadata 형태는 기존과 동일(프론트 BuildRecommendationView 호환):
+ *   { originalId, type:'RelicSet', '2pc':{desc,params}, '4pc':{desc,params}, parts, srsIconPath }
+ *
+ * - 목록: https://starrailstation.com/kr/relics   (entries: pageId=세트ID=originalId)
+ * - 상세: https://starrailstation.com/kr/relics/{pageId}  (pieces lore 보강)
+ */
 export class RelicScraper extends ScraperBase {
-  private readonly LIST_API_URL =
-    'https://api.hakush.in/hsr/data/relicset.json';
-  private readonly DETAIL_API_BASE =
-    'https://api.hakush.in/hsr/data/kr/relicset';
-  private readonly SRS_URL = 'https://starrailstation.com/kr/relics';
-  private readonly SRS_CDN = 'https://cdn.starrailstation.com/assets/';
+  private readonly LIST_URL = `${SRS_BASE}/kr/relics`;
+  private readonly DETAIL_BASE = `${SRS_BASE}/kr/relics`;
 
   constructor() {
     super('starrail');
   }
 
-  /**
-   * Fetch mapping from StarRailStation (Names -> Image Hashes)
-   */
-  private async fetchSRSMapping(): Promise<Record<string, any>> {
-    try {
-      logger.info('Fetching image mapping from StarRailStation...');
-      const { data: html } = await axios.get(this.SRS_URL, {
-        timeout: 15000,
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        },
-      });
-      const markerMatch = html.match(/window\.PAGE_CONFIG\s*=\s*\{/);
-      if (!markerMatch) {
-        logger.warn('StarRailStation PAGE_CONFIG marker not found!');
-        logger.warn(
-          `HTML Snippet (First 500 chars): ${html.substring(0, 500)}`,
-        );
-        return {};
-      }
-
-      const startIdx = markerMatch.index;
-      const jsonStartIdx = html.indexOf('{', startIdx);
-      if (jsonStartIdx === -1) {
-        logger.warn('StarRailStation PAGE_CONFIG opening brace not found!');
-        return {};
-      }
-
-      let configString = '';
-      let depth = 0;
-      for (let i = jsonStartIdx; i < html.length; i++) {
-        const char = html[i];
-        if (char === '{') depth++;
-        else if (char === '}') depth--;
-
-        if (depth === 0) {
-          configString = html.substring(jsonStartIdx, i + 1);
-          break;
-        }
-      }
-
-      if (!configString) {
-        logger.warn('Failed to find matching closing brace for PAGE_CONFIG');
-        return {};
-      }
-
-      // If JSON.parse fails, we'll log the string
-      let config;
-      try {
-        config = JSON.parse(configString);
-      } catch (parseErr: any) {
-        logger.error(
-          `JSON parse failed for PAGE_CONFIG. Error: ${parseErr.message}`,
-        );
-        logger.error(`String start: ${configString.substring(0, 100)}...`);
-        logger.error(
-          `String end: ...${configString.substring(configString.length - 100)}`,
-        );
-        return {};
-      }
-      const mapping: Record<string, any> = {};
-      logger.info(`Config keys: ${Object.keys(config).join(', ')}`);
-
-      if (config.entries && Array.isArray(config.entries)) {
-        for (const entry of config.entries) {
-          // Normalize name: Remove all whitespace for matching
-          const normalized = (entry.name || '').replace(/\s/g, '');
-          mapping[normalized] = {
-            setIcon: entry.iconPath,
-            pieces: entry.pieces || {},
-          };
-        }
-      }
-      logger.info(`Loaded ${Object.keys(mapping).length} SRS relic mappings.`);
-      return mapping;
-    } catch (e) {
-      logger.error('Failed to fetch SRS mapping:', e);
-      return {};
-    }
-  }
-
-  /**
-   * Fetch detailed relic set info from StarRailStation
-   */
-  private async fetchSRSDetail(id: string): Promise<any> {
-    try {
-      const url = `${this.SRS_URL}/${id}`;
-      const { data: html } = await axios.get(url, {
-        timeout: 15000,
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-      });
-      const markerMatch = html.match(/window\.PAGE_CONFIG\s*=\s*\{/);
-      if (!markerMatch) return null;
-
-      const startIdx = markerMatch.index;
-      const jsonStartIdx = html.indexOf('{', startIdx);
-      let configString = '';
-      let depth = 0;
-      for (let i = jsonStartIdx; i < html.length; i++) {
-        const char = html[i];
-        if (char === '{') depth++;
-        else if (char === '}') depth--;
-        if (depth === 0) {
-          configString = html.substring(jsonStartIdx, i + 1);
-          break;
-        }
-      }
-      return JSON.parse(configString);
-    } catch (e) {
-      logger.error(`Failed to fetch SRS detail for ${id}:`, e);
-      return null;
-    }
-  }
-
-  async scrape(): Promise<ScrapedData[]> {
-    logger.info('Starting Star Rail Relic scraping (Multi-Source mode)...');
+  async scrape(limit?: number): Promise<ScrapedData[]> {
+    logger.info('Starting Star Rail Relic scraping (StarRailStation)...');
     const results: ScrapedData[] = [];
 
-    // 0. Get Star Rail Game ID
-    const game = await prisma.game.findUnique({
-      where: { slug: 'starrail' },
-    });
-
+    const game = await prisma.game.findUnique({ where: { slug: 'starrail' } });
     if (!game) {
-      logger.error('Star Rail game record not found in database!');
-      return results;
+      throw new Error('Star Rail game record not found in database!');
     }
 
-    // 1. Load SRS Mapping
-    const srsMapping = await this.fetchSRSMapping();
+    // 1. 목록
+    const listConfig = await fetchPageConfig(this.LIST_URL);
+    let entries: any[] = Array.isArray(listConfig.entries)
+      ? listConfig.entries
+      : [];
+    if (entries.length === 0) {
+      throw new Error('Relic list has 0 entries (SRS 구조 변경 의심)');
+    }
+    if (limit) entries = entries.slice(0, limit);
+    logger.info(`Found ${entries.length} relic sets from StarRailStation.`);
 
-    try {
-      const { data: setMap } = await axios.get(this.LIST_API_URL, { timeout: 15000 });
-      const setIds = Object.keys(setMap);
-      logger.info(`Found ${setIds.length} relic sets from Hakush.in.`);
+    let processed = 0;
+    let errors = 0;
+    for (const entry of entries) {
+      processed++;
+      const originalId = String(entry.pageId ?? '');
+      if (!originalId) {
+        logger.warn(`Relic entry missing pageId: ${entry.name}`);
+        continue;
+      }
+      logger.info(
+        `[SR-Relic] ${processed}/${entries.length} ${entry.name} (${originalId})`,
+      );
 
-      for (const id of setIds) {
+      try {
+        // 2. 상세(파츠 lore 보강) — 실패해도 목록 데이터로 진행
+        let detail: any = null;
         try {
-          // Check if relic set already exists in database
+          detail = await fetchPageConfig(`${this.DETAIL_BASE}/${originalId}`);
+        } catch (e) {
+          logger.warn(`Relic detail fetch failed for ${originalId}, using list entry only.`);
+        }
 
-          const detailUrl = `${this.DETAIL_API_BASE}/${id}.json`;
-          const { data: detail } = await axios.get(detailUrl, { timeout: 15000 });
+        const name = detail?.name || entry.name || `RelicSet_${originalId}`;
+        const rarity = entry.rarity ?? detail?.rarity ?? 5;
+        const skills: any[] = detail?.skills || entry.skills || [];
 
-          const name = detail.Name || setMap[id].Name || `RelicSet_${id}`;
-          const normalizedName = name.replace(/\s/g, '');
+        // 세트 아이콘
+        const localImageUrl = await this.dl(
+          entry.iconPath || detail?.iconPath,
+          `set_${originalId}`,
+          'relic-set',
+        );
 
-          let localImageUrl = '';
+        // 세트 보너스 (2pc / 4pc)
+        const bonus2pc = this.getSetBonus(skills, 2);
+        const bonus4pc = this.getSetBonus(skills, 4);
 
-          // 2. Map to SRS Entry
-          const srsEntry = srsMapping[normalizedName];
-          let srsDetail: any = null;
-
-          if (srsEntry) {
-            logger.info(`✅ Mapping success: ${name} (ID: ${id})`);
-
-            // Image Download
-            if (srsEntry.setIcon) {
-              const imageUrl = this.SRS_CDN + srsEntry.setIcon + '.webp';
-              logger.info(`Downloading image: ${imageUrl}`);
-              const downloadedPath = await ImageDownloader.downloadAndSave(
-                imageUrl,
-                'starrail',
-                'relic-set',
-                id,
-              );
-              if (downloadedPath) {
-                localImageUrl = downloadedPath;
-              }
-            }
-
-            // Fetch SRS Detail for Lore and detailed skill params
-            srsDetail = await this.fetchSRSDetail(id);
-          } else {
-            logger.warn(
-              `❌ Mapping failed: ${name} (Normalized: ${normalizedName}, ID: ${id})`,
-            );
-          }
-
-          // 3. Process Individual Pieces
-          const parts: Record<string, any> = {};
-          if (detail.Parts) {
-            for (const [partId, partInfo] of Object.entries(
-              detail.Parts as any,
-            )) {
-              const partName = (partInfo as any).Name;
-
-              // Find matching piece in SRS detail
-              let srsPiece: any = null;
-              if (srsDetail && srsDetail.pieces) {
-                const normalizedPartName = partName.replace(/\s/g, '');
-                srsPiece = Object.values(srsDetail.pieces).find(
-                  (p: any) =>
-                    (p.name || '').replace(/\s/g, '') === normalizedPartName,
-                );
-              }
-
-              let localPartIconUrl = '';
-              if (srsPiece && srsPiece.iconPath) {
-                const imageUrl = this.SRS_CDN + srsPiece.iconPath + '.webp';
-                const downloadedPath = await ImageDownloader.downloadAndSave(
-                  imageUrl,
-                  'starrail',
-                  'relic-piece',
-                  partId,
-                );
-                if (downloadedPath) {
-                  localPartIconUrl = downloadedPath;
-                }
-              }
-
-              parts[partId] = {
-                name: partName,
-                iconUrl: localPartIconUrl,
-                desc: srsPiece?.lore || (partInfo as any).Desc || '',
-                story: srsPiece?.loreTitle || (partInfo as any).Story || '',
-                rarityData: srsPiece?.rarityData || null,
-              };
-            }
-          }
-
-          // 4. Extract Set Bonuses
-          const getSetBonus = (num: number) => {
-            const hBonus = detail.RequireNum?.[num.toString()];
-            const sBonus = srsDetail?.skills?.find(
-              (s: any) => s.useNum === num,
-            );
-            return {
-              desc: sBonus?.desc || hBonus?.Desc || '',
-              params: sBonus?.params || hBonus?.ParamList || [],
-            };
+        // 파츠 (상세 pieces 우선, 없으면 목록 pieces)
+        const piecesSrc = detail?.pieces || entry.pieces || {};
+        const parts: Record<string, any> = {};
+        for (const [partId, piece] of Object.entries(piecesSrc as any)) {
+          const p = piece as any;
+          const iconUrl = await this.dl(
+            p.iconPath,
+            `piece_${originalId}_${partId}`,
+            'relic-piece',
+          );
+          parts[partId] = {
+            name: p.name || p.baseTypeText || '',
+            iconUrl,
+            desc: p.lore || p.miniLore || '',
+            story: p.loreTitle || '',
+            rarityData: p.rarityData || null,
           };
+        }
 
-          const bonus2pc = getSetBonus(2);
-          const bonus4pc = getSetBonus(4);
+        const metadata = {
+          originalId,
+          type: 'RelicSet',
+          relicType: entry.relicType ?? detail?.relicType,
+          '2pc': bonus2pc,
+          '4pc': bonus4pc,
+          parts,
+          srsIconPath: entry.iconPath || detail?.iconPath,
+        };
 
-          // 5. DB Upsert
-          const metadata = {
-            originalId: id,
-            type: 'RelicSet',
-            '2pc': bonus2pc,
-            '4pc': bonus4pc,
-            parts: parts,
-            srsIconPath: srsEntry?.setIcon,
-          };
+        const description = `2pc: ${bonus2pc.desc}\n4pc: ${bonus4pc.desc}`;
 
-          const existingItem = await prisma.item.findFirst({
-            where: {
+        // 3. 자체 upsert (스케줄러는 data.length만 사용)
+        const existing = await prisma.item.findFirst({
+          where: {
+            gameId: game.id,
+            metadata: { path: ['originalId'], equals: originalId },
+          },
+        });
+
+        if (existing) {
+          await prisma.item.update({
+            where: { id: existing.id },
+            data: { name, rarity, imageUrl: localImageUrl, description, metadata },
+          });
+          logger.info(`Updated RelicSet: ${name} (ID: ${originalId})`);
+        } else {
+          await prisma.item.create({
+            data: {
               gameId: game.id,
-              metadata: {
-                path: ['originalId'],
-                equals: id,
-              },
+              name,
+              type: 'RelicSet',
+              rarity,
+              imageUrl: localImageUrl,
+              description,
+              metadata,
             },
           });
-
-          if (existingItem) {
-            await prisma.item.update({
-              where: { id: existingItem.id },
-              data: {
-                name: name,
-                imageUrl: localImageUrl,
-                description: `2pc: ${bonus2pc.desc}\n4pc: ${bonus4pc.desc}`,
-                metadata: metadata,
-              },
-            });
-            logger.info(`Updated RelicSet: ${name} (ID: ${id})`);
-          } else {
-            await prisma.item.create({
-              data: {
-                gameId: game.id,
-                name: name,
-                type: 'RelicSet',
-                rarity: 5,
-                imageUrl: localImageUrl,
-                description: `2pc: ${bonus2pc.desc}\n4pc: ${bonus4pc.desc}`,
-                metadata: metadata,
-              },
-            });
-            logger.info(`Created RelicSet: ${name} (ID: ${id})`);
-          }
-
-          results.push({
-            name: name,
-            sourceUrl: detailUrl,
-            imageUrl: localImageUrl,
-            metadata: metadata,
-          });
-        } catch (innerErr) {
-          logger.error(`Failed to process RelicSet ${id}:`, innerErr);
+          logger.info(`Created RelicSet: ${name} (ID: ${originalId})`);
         }
+
+        results.push({ name, sourceUrl: `${this.DETAIL_BASE}/${originalId}`, imageUrl: localImageUrl, metadata });
+      } catch (innerErr) {
+        errors++;
+        logger.error(`Failed to process RelicSet ${originalId}:`, innerErr);
       }
-    } catch (e) {
-      logger.error('Error scraping RelicSets:', e);
+    }
+
+    if (results.length === 0 && errors > 0) {
+      throw new Error(`All ${errors} relic sets failed (SRS 장애/구조 변경 의심)`);
+    }
+    if (errors > 0) {
+      logger.warn(`Relic scrape partial: ${results.length} ok / ${errors} failed`);
     }
     return results;
+  }
+
+  /** skills[]에서 useNum(2 또는 4) 세트보너스 추출 → { desc, params } */
+  private getSetBonus(skills: any[], num: number): { desc: string; params: number[] } {
+    const s = Array.isArray(skills)
+      ? skills.find((x) => x.useNum === num)
+      : null;
+    return {
+      desc: s?.desc || '',
+      params: Array.isArray(s?.params) ? s.params : [],
+    };
+  }
+
+  private async dl(
+    iconPath: string | undefined | null,
+    fileName: string,
+    category: string,
+  ): Promise<string | null> {
+    const url = srsAssetUrl(iconPath);
+    if (!url) return null;
+    return ImageDownloader.downloadAndSave(url, 'starrail', category, fileName);
   }
 }
