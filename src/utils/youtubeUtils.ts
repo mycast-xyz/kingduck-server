@@ -110,8 +110,14 @@ class YoutubeUtils {
 
       await youtubedl(url, {
         output: outputPathTemplate,
+        // 세로 Shorts는 픽셀 height가 720p=1280 / 1080p=1920이라 height<=1280으로 720p까지 허용.
+        // 브라우저 <video> 호환을 위해 avc1(H.264) mp4 우선(av01/AV1은 Safari 등 호환 좁음).
+        // 영상은 InfoMainImageView에서 muted 배경으로 재생되므로 video-only로 받아 ffmpeg 병합 불필요.
         format:
-          'bestvideo[height<=1080][ext=webm]/bestvideo[height<=1080][ext=mp4]/best',
+          'bestvideo[height<=1280][vcodec^=avc1][ext=mp4]/bestvideo[height<=1280][ext=mp4]/bestvideo[height<=1280]/best',
+        // YouTube n-challenge 해결용 JS 런타임. 기본은 deno만 켜져 있어 node를 명시한다(설치돼 있음).
+        // 이게 없으면 챌린지 실패로 고화질 포맷이 누락돼 360p(format18)만 받아진다.
+        jsRuntimes: 'node',
         noWarnings: true,
       });
 
