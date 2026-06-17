@@ -90,8 +90,10 @@ export class DataSyncService {
             data: {
               name: item.name,
               rarity: item.rarity,
-              weaponType: item.weaponType,
-              role: item.role,
+              // weaponType/role은 String 컬럼. 일부 게임(엔드필드)은 숫자 코드라 강제 변환(B-H4b 선행 시 노출).
+              weaponType:
+                item.weaponType != null ? String(item.weaponType) : null,
+              role: item.role != null ? String(item.role) : null,
               description: item.description,
               imageUrl: item.imageUrl,
               elementId,
@@ -108,8 +110,10 @@ export class DataSyncService {
               gameId: game.id,
               name: item.name,
               rarity: item.rarity,
-              weaponType: item.weaponType,
-              role: item.role,
+              // weaponType/role은 String 컬럼. 일부 게임(엔드필드)은 숫자 코드라 강제 변환(B-H4b 선행 시 노출).
+              weaponType:
+                item.weaponType != null ? String(item.weaponType) : null,
+              role: item.role != null ? String(item.role) : null,
               description: item.description,
               imageUrl: item.imageUrl,
               elementId,

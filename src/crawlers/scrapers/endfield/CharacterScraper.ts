@@ -293,6 +293,8 @@ export class EndfieldCharacterScraper extends ScraperBase {
               cardImageUrl: localSplashUrl, // Use local path
               originalIconUrl: remoteIconUrl,
               originalSplashUrl: remoteSplashUrl,
+              // 정규 식별자(다른 게임과 통일). 미설정 시 syncCharacters가 전부 skip된다. (B-H4b 선행)
+              originalId: charId != null ? String(charId) : undefined,
             },
             elementId: elementId,
             pathId: pathId,

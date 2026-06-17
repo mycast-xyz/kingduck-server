@@ -154,6 +154,13 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
             metadata: {
               ...processedData,
               cardImageUrl: processedData.RolePortrait,
+              // 정규 식별자(다른 게임과 통일). WW는 게임 내 캐릭터 Id를 사용. (B-H4b 선행)
+              originalId:
+                processedData.Id != null
+                  ? String(processedData.Id)
+                  : item.Id != null
+                    ? String(item.Id)
+                    : undefined,
             },
           };
 
