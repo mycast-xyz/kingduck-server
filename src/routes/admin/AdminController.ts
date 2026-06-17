@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
+import { sendOk } from '../../utils/responseBuilder';
 
 // B-H3: 페이지네이션 입력 클램프 헬퍼
 // ?limit=99999999 (전체 로드) 및 ?page=-5 (음수 skip → Prisma 500) 방지
@@ -49,11 +50,8 @@ export class AdminController {
         },
       }));
 
-      res.status(200).json({
-        resultCode: 200,
-        resultMsg: '성공',
-        items: gameList,
-      });
+      // 표준 봉투로 통일: items → data (B-M1)
+      sendOk(res, gameList);
     } catch (error) {
       logger.error('getGameList Error:', error);
       res.status(500).json({
