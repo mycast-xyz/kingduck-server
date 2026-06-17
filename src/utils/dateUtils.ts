@@ -1,3 +1,5 @@
+import logger from './logger';
+
 export const formatDateString = (dateStr: string): string => {
   try {
     let date: Date;
@@ -14,7 +16,7 @@ export const formatDateString = (dateStr: string): string => {
     // YYYY-MM-DD 형식으로 반환
     return date.toISOString().split('T')[0];
   } catch (error) {
-    console.error('날짜 변환 중 오류:', error);
+    logger.error('날짜 변환 중 오류:', error);
     return dateStr; // 변환 실패시 원본 반환
   }
 };
@@ -30,7 +32,7 @@ export const formatDateTimeString = (dateStr: string): string => {
 
     return date.toISOString();
   } catch (error) {
-    console.error('날짜시간 변환 중 오류:', error);
+    logger.error('날짜시간 변환 중 오류:', error);
     return dateStr;
   }
 };

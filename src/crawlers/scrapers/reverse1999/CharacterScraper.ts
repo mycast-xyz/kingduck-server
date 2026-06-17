@@ -274,7 +274,7 @@ export class Reverse1999CharacterScraper extends ScraperBase {
                   headings.forEach((h) => {
                     const title = (h as HTMLElement).innerText?.trim();
                     if (!title) return;
-                    console.log(`[DEBUG] Scraped Section Title: "${title}"`);
+                    logger.info(`[DEBUG] Scraped Section Title: "${title}"`);
 
                     let content = '';
                     let images: string[] = [];

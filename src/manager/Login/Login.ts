@@ -4,6 +4,7 @@ import { BadRequest } from '../Errors/BadRequest';
 import { InternalServerError } from '../Errors/InternalServerError';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config/config';
+import logger from '../../utils/logger';
 
 interface LoginResult {
   success: boolean;
@@ -79,7 +80,7 @@ export class Login {
       }
       return true;
     } catch (error) {
-      console.error('토큰 검증 실패:', error);
+      logger.error('토큰 검증 실패:', error);
       return false;
     }
   }

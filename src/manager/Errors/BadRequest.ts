@@ -1,3 +1,5 @@
+import logger from '../../utils/logger';
+
 export class BadRequest extends Error {
   private item: string;
   private resultCode: number;
@@ -9,10 +11,10 @@ export class BadRequest extends Error {
     this.resultCode = 400;
 
     // 로그 남기기
-    console.error(`[BadRequest] ${new Date().toISOString()}`);
-    console.error(`- Message: ${message}`);
-    console.error(`- Item: ${item}`);
-    console.error(`- Code: ${this.resultCode}`);
+    logger.error(`[BadRequest] ${new Date().toISOString()}`);
+    logger.error(`- Message: ${message}`);
+    logger.error(`- Item: ${item}`);
+    logger.error(`- Code: ${this.resultCode}`);
   }
 
   public getItem(): string {

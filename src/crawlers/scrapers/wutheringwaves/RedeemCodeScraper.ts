@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import puppeteer from 'puppeteer';
+import logger from '../../../utils/logger';
 
 const WW_GAME_SLUG = 'wutheringwaves';
 const SEARCH_URL =
@@ -13,7 +14,7 @@ export class RedeemCodeScraper {
   }
 
   async scrape() {
-    console.log(`[WWRedeemCodeScraper] Starting scrape for ${WW_GAME_SLUG}...`);
+    logger.info(`[WWRedeemCodeScraper] Starting scrape for ${WW_GAME_SLUG}...`);
 
     // Find Game ID
     const game = await this.prisma.game.findUnique({
@@ -21,23 +22,23 @@ export class RedeemCodeScraper {
     });
 
     if (!game) {
-      console.error(`[WWRedeemCodeScraper] Game not found: ${WW_GAME_SLUG}`);
+      logger.error(`[WWRedeemCodeScraper] Game not found: ${WW_GAME_SLUG}`);
       return null;
     }
 
     try {
       const result = await this.scrapeArca();
       if (!result.title || result.codes.length === 0) {
-        console.log('[WWRedeemCodeScraper] No codes or title found.');
+        logger.info('[WWRedeemCodeScraper] No codes or title found.');
         return null;
       }
 
       await this.saveToDb(game.id, result);
-      console.log('[WWRedeemCodeScraper] Scrape completed.');
+      logger.info('[WWRedeemCodeScraper] Scrape completed.');
 
       return result;
     } catch (error) {
-      console.error('[WWRedeemCodeScraper] Error:', error);
+      logger.error('[WWRedeemCodeScraper] Error:', error);
       return null;
     }
   }
@@ -47,7 +48,7 @@ export class RedeemCodeScraper {
     period: string;
     codes: string[];
   }> {
-    console.log(`[WWRedeemCodeScraper] Launching Puppeteer...`);
+    logger.info(`[WWRedeemCodeScraper] Launching Puppeteer...`);
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -74,11 +75,11 @@ export class RedeemCodeScraper {
       });
 
       if (!postLink) {
-        console.log('[WWRedeemCodeScraper] No post found with keyword.');
+        logger.info('[WWRedeemCodeScraper] No post found with keyword.');
         return { title: '', period: '', codes: [] };
       }
 
-      console.log(`[WWRedeemCodeScraper] Found post: ${postLink}`);
+      logger.info(`[WWRedeemCodeScraper] Found post: ${postLink}`);
 
       // 3. Go to the post
       await page.goto(postLink, { waitUntil: 'networkidle2' });
@@ -200,7 +201,7 @@ export class RedeemCodeScraper {
     gameId: number,
     data: { title: string; period: string; codes: string[] },
   ) {
-    console.log(`[WWRedeemCodeScraper] Saving to DB: ${data.title}`);
+    logger.info(`[WWRedeemCodeScraper] Saving to DB: ${data.title}`);
 
     const endTime = this.parseEndTime(data.period);
 
@@ -220,13 +221,13 @@ export class RedeemCodeScraper {
           endTime: endTime,
         },
       });
-      console.log(`[WWRedeemCodeScraper] Created new group: ${group.id}`);
+      logger.info(`[WWRedeemCodeScraper] Created new group: ${group.id}`);
     } else {
       group = await this.prisma.redeemGroup.update({
         where: { id: group.id },
         data: { periodText: data.period, endTime: endTime },
       });
-      console.log(`[WWRedeemCodeScraper] Updated existing group: ${group.id}`);
+      logger.info(`[WWRedeemCodeScraper] Updated existing group: ${group.id}`);
     }
 
     for (const codeStr of data.codes) {
@@ -241,9 +242,9 @@ export class RedeemCodeScraper {
             code: codeStr,
           },
         });
-        console.log(`[WWRedeemCodeScraper] Upserted code: ${codeStr}`);
+        logger.info(`[WWRedeemCodeScraper] Upserted code: ${codeStr}`);
       } catch (e) {
-        console.error(
+        logger.error(
           `[WWRedeemCodeScraper] Failed to upsert code ${codeStr}: ${e}`,
         );
       }

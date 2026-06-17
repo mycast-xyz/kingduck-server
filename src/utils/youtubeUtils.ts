@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import logger from './logger';
 
 /**
  * YouTube 동영상 검색, 다운로드 및 처리를 위한 유틸리티 클래스
@@ -39,14 +40,14 @@ class YoutubeUtils {
       await new Promise((resolve) => setTimeout(resolve, 3000)); // Initial load
 
       // Scroll down multiple times to load all content (infinite scroll)
-      console.log('Scrolling to load all Shorts...');
+      logger.info('Scrolling to load all Shorts...');
       for (let i = 0; i < 10; i++) {
         await page.evaluate(() => {
           window.scrollTo(0, document.documentElement.scrollHeight);
         });
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
-      console.log('Finished scrolling');
+      logger.info('Finished scrolling');
 
       // YouTube의 초기 데이터 추출
       const pageConfig = await page.evaluate(() => {
@@ -59,7 +60,7 @@ class YoutubeUtils {
 
       return pageConfig;
     } catch (error) {
-      console.error('페이지 설정 추출 중 오류 발생:', error);
+      logger.error('페이지 설정 추출 중 오류 발생:', error);
       throw error;
     } finally {
       await browser.close();
@@ -86,10 +87,10 @@ class YoutubeUtils {
       let ytDlpPath = 'yt-dlp'; // Default to global path
 
       if (fs.existsSync(localBinaryPath)) {
-        console.log(`Using local yt-dlp binary: ${localBinaryPath}`);
+        logger.info(`Using local yt-dlp binary: ${localBinaryPath}`);
         ytDlpPath = localBinaryPath;
       } else {
-        console.log(
+        logger.info(
           'Using global yt-dlp (local binary not found in bin/yt-dlp.exe)',
         );
       }
@@ -100,7 +101,7 @@ class YoutubeUtils {
         fs.mkdirSync(saveDirectory, { recursive: true });
       }
 
-      console.log('Downloading to:', saveDirectory);
+      logger.info('Downloading to:', saveDirectory);
 
       const outputPathTemplate = path.join(
         saveDirectory,
@@ -123,17 +124,17 @@ class YoutubeUtils {
 
       if (downloadedFile) {
         const extension = downloadedFile.split('.').pop() || 'webm';
-        console.log(`Successfully downloaded: ${downloadedFile}`);
+        logger.info(`Successfully downloaded: ${downloadedFile}`);
         return extension;
       }
 
       return null;
       return null;
     } catch (error: any) {
-      console.error('동영상 다운로드 실패 상세:', error);
-      console.error('동영상 다운로드 실패 메시지:', error.message);
-      if (error.stderr) console.error('STDERR:', error.stderr);
-      if (error.stdout) console.error('STDOUT:', error.stdout);
+      logger.error('동영상 다운로드 실패 상세:', error);
+      logger.error('동영상 다운로드 실패 메시지:', error.message);
+      if (error.stderr) logger.error('STDERR:', error.stderr);
+      if (error.stdout) logger.error('STDOUT:', error.stdout);
       return null;
     }
   }
@@ -145,7 +146,7 @@ class YoutubeUtils {
    */
   static async downloadVideoById(videoId: string): Promise<string | null> {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`다운로드 시작: ${url}`);
+    logger.info(`다운로드 시작: ${url}`);
     return await this.downloadYoutubeVideo(url, videoId);
   }
 
@@ -161,7 +162,7 @@ class YoutubeUtils {
   ): Promise<string | boolean> {
     try {
       const title = searchQuery;
-      console.log(`검색 시작: "${title}"`);
+      logger.info(`검색 시작: "${title}"`);
 
       // YouTube 검색 결과 페이지에서 데이터 추출
       const youtubeDataList = await YoutubeUtils.getPageConfig(
@@ -179,7 +180,7 @@ class YoutubeUtils {
           ?.contents?.[0]?.itemSectionRenderer?.contents[0];
 
       if (!contents) {
-        console.log('검색 결과를 찾을 수 없습니다.');
+        logger.info('검색 결과를 찾을 수 없습니다.');
         return false;
       }
 
@@ -187,7 +188,7 @@ class YoutubeUtils {
       const videoData = contents?.videoRenderer;
 
       if (!videoData) {
-        console.log(`검색 실패: "${title}" 관련 동영상을 찾을 수 없습니다.`);
+        logger.info(`검색 실패: "${title}" 관련 동영상을 찾을 수 없습니다.`);
         return false;
       }
 
@@ -196,15 +197,15 @@ class YoutubeUtils {
 
       // 제목 일치 여부 확인 후 다운로드
       if (youtubeTitle.includes(title)) {
-        console.log(`검색 성공: "${title}" 동영상을 찾았습니다.`);
+        logger.info(`검색 성공: "${title}" 동영상을 찾았습니다.`);
         await YoutubeUtils.downloadVideoById(youtubeVideoId);
         return youtubeVideoId;
       } else {
-        console.log(`검색 실패: "${title}" 동영상을 찾을 수 없습니다.`);
+        logger.info(`검색 실패: "${title}" 동영상을 찾을 수 없습니다.`);
         return false;
       }
     } catch (error) {
-      console.error('YouTube 검색 및 다운로드 중 오류 발생:', error);
+      logger.error('YouTube 검색 및 다운로드 중 오류 발생:', error);
       return false;
     }
   }

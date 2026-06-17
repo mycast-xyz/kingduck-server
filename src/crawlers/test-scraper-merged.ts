@@ -1,22 +1,23 @@
 import { EndfieldCharacterScraper } from './scrapers/endfield/CharacterScraper';
 import { prisma } from '../utils/prisma';
+import logger from '../utils/logger';
 
 async function main() {
   const scraper = new EndfieldCharacterScraper();
 
   // 1. Scrape
-  console.log('Running Scrape...');
+  logger.info('Running Scrape...');
   const data = await scraper.scrape();
-  console.log(`Scraped ${data.length} items.`);
+  logger.info(`Scraped ${data.length} items.`);
 
   // 2. Save
-  console.log('Running Save...');
+  logger.info('Running Save...');
   await scraper.save(data);
-  console.log('Done.');
+  logger.info('Done.');
 }
 
 main()
-  .catch(console.error)
+  .catch((e) => logger.error(e))
   .finally(async () => {
     await prisma.$disconnect();
   });

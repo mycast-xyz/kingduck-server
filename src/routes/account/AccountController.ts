@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { HashEncryptionUtil } from '../../manager/Login/HashEncryptionUtil';
 import { randomUUID } from 'crypto';
+import logger from '../../utils/logger';
 
 /**
  * 계정 생성 및 관리를 위한 컨트롤러 클래스
@@ -56,7 +57,7 @@ export class AccountController {
         resultMsg: '생성 완료',
       });
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       // 에러 발생 시 에러 응답
       return res.status(500).json({
         resultCode: 500,
@@ -97,7 +98,7 @@ export class AccountController {
         resultMsg: '사용 가능한 이메일입니다.',
       });
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       return res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',

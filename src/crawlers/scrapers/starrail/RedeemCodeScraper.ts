@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import puppeteer from 'puppeteer';
+import logger from '../../../utils/logger';
 
 const HSR_GAME_SLUG = 'starrail';
 const ARCA_URL = 'https://arca.live/b/hkstarrail/132589689?mode=best&p=1';
@@ -12,7 +13,7 @@ export class RedeemCodeScraper {
   }
 
   async scrape() {
-    console.log(`[RedeemCodeScraper] Starting scrape for ${HSR_GAME_SLUG}...`);
+    logger.info(`[RedeemCodeScraper] Starting scrape for ${HSR_GAME_SLUG}...`);
 
     // Find Game ID
     const game = await this.prisma.game.findUnique({
@@ -20,23 +21,23 @@ export class RedeemCodeScraper {
     });
 
     if (!game) {
-      console.error(`[RedeemCodeScraper] Game not found: ${HSR_GAME_SLUG}`);
+      logger.error(`[RedeemCodeScraper] Game not found: ${HSR_GAME_SLUG}`);
       return null;
     }
 
     try {
       const result = await this.scrapeArca();
       if (!result.title || result.codes.length === 0) {
-        console.log('[RedeemCodeScraper] No codes or title found.');
+        logger.info('[RedeemCodeScraper] No codes or title found.');
         return null;
       }
 
       await this.saveToDb(game.id, result);
-      console.log('[RedeemCodeScraper] Scrape completed.');
+      logger.info('[RedeemCodeScraper] Scrape completed.');
 
       return result;
     } catch (error) {
-      console.error('[RedeemCodeScraper] Error:', error);
+      logger.error('[RedeemCodeScraper] Error:', error);
       return null;
     }
   }
@@ -46,7 +47,7 @@ export class RedeemCodeScraper {
     period: string;
     codes: string[];
   }> {
-    console.log(`[RedeemCodeScraper] Launching Puppeteer...`);
+    logger.info(`[RedeemCodeScraper] Launching Puppeteer...`);
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -134,7 +135,7 @@ export class RedeemCodeScraper {
     gameId: number,
     data: { title: string; period: string; codes: string[] },
   ) {
-    console.log(`[RedeemCodeScraper] Saving to DB: ${data.title}`);
+    logger.info(`[RedeemCodeScraper] Saving to DB: ${data.title}`);
 
     // Parse Period to estimate endTime
     const endTime = this.parseEndTime(data.period);
@@ -156,7 +157,7 @@ export class RedeemCodeScraper {
           endTime: endTime,
         },
       });
-      console.log(`[RedeemCodeScraper] Created new group: ${group.id}`);
+      logger.info(`[RedeemCodeScraper] Created new group: ${group.id}`);
     } else {
       // Update period text and endTime if changed
       group = await this.prisma.redeemGroup.update({
@@ -166,7 +167,7 @@ export class RedeemCodeScraper {
           endTime: endTime,
         },
       });
-      console.log(`[RedeemCodeScraper] Updated existing group: ${group.id}`);
+      logger.info(`[RedeemCodeScraper] Updated existing group: ${group.id}`);
     }
 
     // Upsert Codes
@@ -183,9 +184,9 @@ export class RedeemCodeScraper {
             // reward: // We don't have reward info from this scraper yet
           },
         });
-        console.log(`[RedeemCodeScraper] Upserted code: ${codeStr}`);
+        logger.info(`[RedeemCodeScraper] Upserted code: ${codeStr}`);
       } catch (e) {
-        console.error(
+        logger.error(
           `[RedeemCodeScraper] Failed to upsert code ${codeStr}: ${e}`,
         );
       }

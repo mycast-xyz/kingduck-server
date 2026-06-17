@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import logger from './logger';
 
 class NamuWiki {
   // 나무위키 참조 처리
@@ -42,7 +43,7 @@ class NamuWiki {
       // browser.close()를 호출해야 Chromium 좀비 프로세스를 막을 수 있다.
       return { page, browser };
     } catch (error) {
-      console.error('페이지 로딩 중 오류:', error);
+      logger.error('페이지 로딩 중 오류:', error);
       if (browser) await browser.close();
       throw error;
     }

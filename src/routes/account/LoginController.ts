@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import Login from '../../manager/Login/Login';
+import logger from '../../utils/logger';
 
 export class LoginController {
   /**
@@ -43,7 +44,7 @@ export class LoginController {
         });
       }
     } catch (error) {
-      console.error('로그인 처리 중 오류:', error);
+      logger.error('로그인 처리 중 오류:', error);
       return res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',

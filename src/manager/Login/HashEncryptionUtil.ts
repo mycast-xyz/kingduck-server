@@ -2,6 +2,7 @@
 import bcrypt from 'bcrypt';
 import { BadRequest } from '../Errors/BadRequest';
 import { InternalServerError } from '../Errors/InternalServerError';
+import logger from '../../utils/logger';
 
 export class HashEncryptionUtil {
   private saltRounds: number;
@@ -17,7 +18,7 @@ export class HashEncryptionUtil {
       const hashedPwd = await bcrypt.hash(password, salt); // hash function
       return hashedPwd;
     } catch (error) {
-      console.log(error);
+      logger.error(error);
       throw new InternalServerError('비밀번호 암호화 실패', 'password');
     }
   };
@@ -28,7 +29,7 @@ export class HashEncryptionUtil {
       const match = await bcrypt.compare(password, hashedPwd);
       if (match === true) return match;
     } catch (error) {
-      console.log(error);
+      logger.error(error);
       throw new BadRequest('비밀번호 확인에 실패했습니다.', 'password');
     }
   };

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../utils/prisma';
+import logger from '../../utils/logger';
 
 // B-H3: 페이지네이션 입력 클램프 헬퍼
 // ?limit=99999999 (전체 로드) 및 ?page=-5 (음수 skip → Prisma 500) 방지
@@ -51,7 +52,7 @@ export class AdminController {
         items: gameList,
       });
     } catch (error) {
-      console.error('getGameList Error:', error);
+      logger.error('getGameList Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -103,7 +104,7 @@ export class AdminController {
         },
       });
     } catch (error) {
-      console.error('getCharacterList Error:', error);
+      logger.error('getCharacterList Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -155,7 +156,7 @@ export class AdminController {
         },
       });
     } catch (error) {
-      console.error('getItemList Error:', error);
+      logger.error('getItemList Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -209,7 +210,7 @@ export class AdminController {
         },
       });
     } catch (error) {
-      console.error('getEventList Error:', error);
+      logger.error('getEventList Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -259,7 +260,7 @@ export class AdminController {
         },
       });
     } catch (error) {
-      console.error('getPendingEvents Error:', error);
+      logger.error('getPendingEvents Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -335,7 +336,7 @@ export class AdminController {
         data: updatedEvent,
       });
     } catch (error) {
-      console.error('approveEvent Error:', error);
+      logger.error('approveEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -386,7 +387,7 @@ export class AdminController {
         data: event,
       });
     } catch (error) {
-      console.error('createEvent Error:', error);
+      logger.error('createEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -455,7 +456,7 @@ export class AdminController {
         data: updatedEvent,
       });
     } catch (error) {
-      console.error('updateEvent Error:', error);
+      logger.error('updateEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -500,7 +501,7 @@ export class AdminController {
         resultMsg: '이벤트가 삭제되었습니다.',
       });
     } catch (error) {
-      console.error('deleteEvent Error:', error);
+      logger.error('deleteEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
@@ -571,7 +572,7 @@ export class AdminController {
         data: updatedEvent,
       });
     } catch (error) {
-      console.error('rejectEvent Error:', error);
+      logger.error('rejectEvent Error:', error);
       res.status(500).json({
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',

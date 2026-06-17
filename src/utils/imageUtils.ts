@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import logger from './logger';
 
 export const downloadImage = async (
   url: string,
@@ -9,7 +10,7 @@ export const downloadImage = async (
   filename: string,
 ): Promise<void> => {
   try {
-    console.log('이미지 다운로드 시작:' + filename);
+    logger.info('이미지 다운로드 시작:' + filename);
     const response = await axios.get(url, { responseType: 'arraybuffer' });
 
     if (!fs.existsSync(directory)) {
@@ -27,14 +28,14 @@ export const downloadImage = async (
     if (metadata.format === 'webp') {
       // 이미 webp 형식이면 그대로 저장
       await fs.promises.writeFile(outputPath, response.data);
-      console.log('WebP 이미지 저장 완료:', webpFilename);
+      logger.info('WebP 이미지 저장 완료:', webpFilename);
     } else {
       // webp가 아니면 변환 후 저장
       await sharp(response.data).webp({ quality: 80 }).toFile(outputPath);
-      console.log('이미지 변환 및 저장 완료:', webpFilename);
+      logger.info('이미지 변환 및 저장 완료:', webpFilename);
     }
   } catch (error) {
-    console.error('이미지 다운로드/변환 실패:', error);
+    logger.error('이미지 다운로드/변환 실패:', error);
     throw error;
   }
 };

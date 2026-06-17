@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import initSqlJs from 'sql.js';
 import { prisma } from '../../../utils/prisma';
+import logger from '../../../utils/logger';
 
 export class TrickcalScraper {
   private dbUrl =
@@ -23,7 +24,7 @@ export class TrickcalScraper {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    console.log(`Downloading DB from ${this.dbUrl}...`);
+    logger.info(`Downloading DB from ${this.dbUrl}...`);
     const response = await axios({
       url: this.dbUrl,
       method: 'GET',
@@ -32,7 +33,7 @@ export class TrickcalScraper {
     });
 
     fs.writeFileSync(this.tempDbPath, Buffer.from(response.data));
-    console.log(`DB saved to ${this.tempDbPath}`);
+    logger.info(`DB saved to ${this.tempDbPath}`);
   }
 
   /**
@@ -40,7 +41,7 @@ export class TrickcalScraper {
    */
   async analyzeSchema(): Promise<void> {
     if (!fs.existsSync(this.tempDbPath)) {
-      console.error('DB file not found. Run downloadDatabase() first.');
+      logger.error('DB file not found. Run downloadDatabase() first.');
       return;
     }
 
@@ -51,17 +52,17 @@ export class TrickcalScraper {
     // 테이블 목록 조회
     const result = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
     if (result.length === 0) {
-      console.log('No tables found.');
+      logger.info('No tables found.');
       return;
     }
 
     // result[0].values is array of array of values [[name1], [name2], ...]
     const tables = result[0].values.map((v: any[]) => v[0]);
-    console.log('--- Tables ---');
-    console.log(tables.join(', '));
+    logger.info('--- Tables ---');
+    logger.info(tables.join(', '));
 
     for (const tableName of tables) {
-      console.log(`\n[Table: ${tableName}]`);
+      logger.info(`\n[Table: ${tableName}]`);
       // Columns
       const cols = db.exec(`PRAGMA table_info(${tableName})`);
       if (cols.length > 0) {
@@ -74,7 +75,7 @@ export class TrickcalScraper {
         const colDefs = cols[0].values.map(
           (v: any[]) => `${v[nameIdx]} (${v[typeIdx]})`,
         );
-        console.log(colDefs.join(', '));
+        logger.info(colDefs.join(', '));
       }
 
       // Sample
@@ -87,7 +88,7 @@ export class TrickcalScraper {
         columns.forEach((col, idx) => {
           obj[col] = row[idx];
         });
-        console.log('Sample:', JSON.stringify(obj, null, 2));
+        logger.info('Sample:', JSON.stringify(obj, null, 2));
       }
     }
 
@@ -114,7 +115,7 @@ export class TrickcalScraper {
       },
     });
 
-    console.log(`Game: ${game.name} (${game.id})`);
+    logger.info(`Game: ${game.name} (${game.id})`);
 
     // 2. 매핑 테이블 로드
     const personalityMap = this.getTableMap(db, 'personality', 'comment'); // 속성 (Element)
@@ -179,7 +180,7 @@ export class TrickcalScraper {
       }
       charCount++;
     }
-    console.log(`Processed ${charCount} characters.`);
+    logger.info(`Processed ${charCount} characters.`);
 
     // 4. 아이템 스크래핑 (Equipment)
     const equipments = this.getTableData(db, 'equipment');
@@ -219,7 +220,7 @@ export class TrickcalScraper {
       }
       itemCount++;
     }
-    console.log(`Processed ${itemCount} items.`);
+    logger.info(`Processed ${itemCount} items.`);
 
     db.close();
   }
@@ -316,6 +317,6 @@ export class TrickcalScraper {
 
     const outputPath = path.join(process.cwd(), 'trickcal_db_analysis.json');
     fs.writeFileSync(outputPath, JSON.stringify(analysisResult, null, 2));
-    console.log(`Analysis saved to ${outputPath}`);
+    logger.info(`Analysis saved to ${outputPath}`);
   }
 }
