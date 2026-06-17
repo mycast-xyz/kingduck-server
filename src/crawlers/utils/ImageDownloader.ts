@@ -1,8 +1,8 @@
-import axios from 'axios';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../utils/logger';
+import { axiosGetWithRetry } from './httpRetry';
 
 /**
  * Game-specific configuration for image downloading
@@ -75,10 +75,8 @@ export class ImageDownloader {
       // Get game-specific config
       const gameConfig = this.GAME_CONFIGS[gameSlug] || {};
 
-      // Download
-      const response = await axios({
-        url,
-        method: 'GET',
+      // Download (전이성 오류는 재시도, 404 등은 fail-fast — B-H7 후속)
+      const response = await axiosGetWithRetry<Buffer>(url, {
         responseType: 'arraybuffer',
         timeout: 15000,
         headers: {

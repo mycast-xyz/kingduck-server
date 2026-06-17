@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { axiosGetWithRetry } from './httpRetry';
 import logger from '../../utils/logger';
 
 /**
@@ -76,7 +76,7 @@ export function mapPathToEn(ko?: string | null): string | undefined {
  * @throws 마커 미발견 / 여는 중괄호 없음 / 짝 중괄호 없음 / JSON 파싱 실패 시
  */
 export async function fetchPageConfig(url: string): Promise<any> {
-	const { data: html } = await axios.get<string>(url, {
+	const { data: html } = await axiosGetWithRetry<string>(url, {
 		timeout: 15000,
 		headers: REQUEST_HEADERS,
 		responseType: 'text',
