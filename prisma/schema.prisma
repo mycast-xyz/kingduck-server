@@ -74,6 +74,7 @@ model CalendarEvent {
   @@index([gameId, startTime])
   @@index([type])
   @@index([status])
+  @@index([reviewedBy]) // reviewer FK 인덱스 (B-M5)
   @@map("calendar_events")
 }
 
@@ -109,6 +110,7 @@ model Element {
   charactersElement Character[] @relation("CharacterElement")
   charactersPath    Character[] @relation("CharacterPath")
 
+  @@unique([gameId, name, type]) // 게임 내 (이름,타입) 중복 방지(findOrCreate 경쟁 차단, B-M5)
   @@index([gameId])
   @@index([gameId, type])
   @@map("elements")
