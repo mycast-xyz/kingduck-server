@@ -50,9 +50,13 @@ const whitelist: string[] = [
 ];
 
 // 보안 헤더: helmet 기본값 적용. CSP는 swagger UI(/api-docs)를 깨뜨릴 수 있어 비활성화.
+// CORP는 cross-origin 허용: /assets의 공개 이미지(로고·캐릭터)를 다른 origin(프론트)에서
+// <img>로 로드해야 하는데, helmet 기본값(same-origin)이 이를 차단한다. 공개 자산이라 안전하며
+// API 보안은 CORS+인증이 담당. (verify에서 dev 5173↔3000 이미지 차단 발견)
 app.use(
   helmet({
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   }),
 );
 
