@@ -113,6 +113,14 @@ export class GenshinCharacterScraper extends ScraperBase {
         const description =
           (d.fetter && typeof d.fetter === 'object' && d.fetter.detail) || '';
 
+        // 프론트 콘텐츠 컴포넌트(SkillTreeView/RankListView)가 starrail과 동일하게 읽도록
+        // HSR 형태로 가공한다: skills(스킬) / ranks_raw(별자리=성혼 등가).
+        const skills = await this.processTalents(d.talent, originalId);
+        const ranks_raw = await this.processConstellations(
+          d.constellation,
+          originalId,
+        );
+
         const metadata: Record<string, any> = {
           originalId,
           rarity,
@@ -124,6 +132,10 @@ export class GenshinCharacterScraper extends ScraperBase {
           cardImageUrl: localCardUrl,
           description,
           fetter: d.fetter ?? null,
+          // 프론트 렌더용(HSR 호환 형태)
+          skills,
+          ranks_raw,
+          // 원본 raw(추후 스탯 등 가공용 보존)
           talent: d.talent ?? null,
           constellation: d.constellation ?? null,
           stats: d.upgrade ?? null,
@@ -156,6 +168,84 @@ export class GenshinCharacterScraper extends ScraperBase {
       );
     }
     return results;
+  }
+
+  /**
+   * talent(스킬) → SkillTreeView가 읽는 HSR 호환 형태.
+   * Ambr talent: { "0": { name, icon, type, promote: { "1": { level, params, description } } } }
+   * 출력: { id, name, type, iconUrl, descLines, levelData:[{level,params}], maxLevel }
+   *   - descLines: "라벨|{param1:F1P}" 형식의 줄 배열(레벨 무관 템플릿). VM이 레벨별 params로 치환.
+   */
+  private async processTalents(
+    talent: any,
+    charId: string,
+  ): Promise<any[]> {
+    if (!talent || typeof talent !== 'object') return [];
+    const out: any[] = [];
+    for (const key of Object.keys(talent)) {
+      const t = talent[key];
+      if (!t || typeof t !== 'object') continue;
+      const promote =
+        t.promote && typeof t.promote === 'object' ? t.promote : {};
+      const lvKeys = Object.keys(promote)
+        .map((n) => Number(n))
+        .filter((n) => !Number.isNaN(n))
+        .sort((a, b) => a - b);
+      const levelData = lvKeys.map((lv) => ({
+        level: promote[lv].level ?? lv,
+        params: Array.isArray(promote[lv].params) ? promote[lv].params : [],
+      }));
+      const firstLv = lvKeys[0];
+      const descLines: string[] = Array.isArray(promote[firstLv]?.description)
+        ? promote[firstLv].description
+        : [];
+      const iconUrl = await this.dlIcon(
+        t.icon,
+        `talent_${charId}_${key}`,
+        'skill',
+      );
+      out.push({
+        id: key,
+        name: t.name || '',
+        type: null,
+        iconUrl,
+        descLines,
+        levelData,
+        maxLevel: levelData.length || 1,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * constellation(별자리) → RankListView가 읽는 HSR(성혼) 호환 형태.
+   * Ambr constellation: { "0": { id, name, icon, description, descriptionBuff } }
+   * 출력: { Id, name, Desc, ParamList:[], Image, iconUrl }
+   */
+  private async processConstellations(
+    constellation: any,
+    charId: string,
+  ): Promise<any[]> {
+    if (!constellation || typeof constellation !== 'object') return [];
+    const out: any[] = [];
+    for (const key of Object.keys(constellation)) {
+      const c = constellation[key];
+      if (!c || typeof c !== 'object') continue;
+      const iconUrl = await this.dlIcon(
+        c.icon,
+        `constellation_${charId}_${key}`,
+        'character',
+      );
+      out.push({
+        Id: c.id ?? Number(key),
+        name: c.name || '',
+        Desc: c.description || '',
+        ParamList: [],
+        Image: iconUrl,
+        iconUrl,
+      });
+    }
+    return out;
   }
 
   private async dlIcon(
