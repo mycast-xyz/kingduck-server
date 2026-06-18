@@ -234,7 +234,9 @@ export class StarRailBuildScraper extends ScraperBase {
       });
       const html = typeof res.data === 'string' ? res.data : '';
       const set = new Set<string>();
-      const re = /href="\/star-rail\/characters\/([a-z0-9-]+)\/?"/g;
+      // 슬러그에 점(.)이 들어가는 경우가 있다(예: silverwolflv.999 = 은랑 LV.999 전용 빌드 페이지).
+      // 점을 빼면 잘려서 폴백 페이지로 가버리므로 반드시 포함.
+      const re = /href="\/star-rail\/characters\/([a-z0-9.-]+)\/?"/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(html))) set.add(m[1]);
       return Array.from(set);
@@ -266,7 +268,9 @@ export class StarRailBuildScraper extends ScraperBase {
     html: string,
     charNameToId: Map<string, string>,
   ): string | null {
-    const slugNorm = slug.replace(/-/g, '');
+    // 점·하이픈 등 비영숫자를 모두 제거해 SRS 맵 키(norm(name))와 정렬.
+    // (silverwolflv.999 → silverwolflv999 = SRS "Silver Wolf LV.999" rankKey 1506)
+    const slugNorm = this.norm(slug);
     const aliasKey = CHAR_ALIAS[slugNorm];
     const bySlug =
       charNameToId.get(slugNorm) ||
