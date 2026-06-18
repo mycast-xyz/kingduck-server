@@ -25,9 +25,8 @@ import { EndfieldEquipmentScraper } from './scrapers/endfield/EquipmentScraper';
 import { EndfieldItemScraper } from './scrapers/endfield/ItemScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
-import { NikkeCharacterScraper } from './scrapers/nikke/CharacterScraper';
+import { BlablalinkCharacterScraper } from './scrapers/nikke/BlablalinkCharacterScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
-import { NikkeBlablalinkImageScraper } from './scrapers/nikke/BlablalinkImageScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
@@ -339,10 +338,12 @@ export const CRAWLER_TASKS: ScraperTask[] = [
   {
     game: 'nikke',
     type: 'character',
+    // blablalink(공식 KR) 단일 소스로 클린 재구축. scrape가 150 미만이면 throw(교체 중단).
     run: async (s) => {
-      const scraper = new NikkeCharacterScraper();
+      const scraper = new BlablalinkCharacterScraper();
       const data = await scraper.scrape();
-      if (data.length > 0) await s.syncCharacters('nikke', data);
+      await s.purgeCharacters('nikke'); // 기존 fandom 데이터 제거(videos+chars), Element 보존
+      await s.syncCharacters('nikke', data);
       return data.length;
     },
   },
@@ -354,15 +355,6 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('nikke', data);
       return data.length;
-    },
-  },
-  {
-    game: 'nikke',
-    type: 'image',
-    // blablalink 공식 포트레이트로 image_url 보강(저해상도 fandom 아이콘 대체). 이미지 전용.
-    run: async () => {
-      const scraper = new NikkeBlablalinkImageScraper();
-      return await scraper.run();
     },
   },
 

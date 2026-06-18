@@ -40,6 +40,25 @@ export class DataSyncService {
     };
   }
 
+  /**
+   * 게임의 캐릭터를 전부 비운다(소스 전환/클린 재구축용). 캐릭터의 videos(FK)를 먼저 지운 뒤 캐릭터 삭제.
+   * Element(속성/특성) 행은 보존한다 — 같은 이름으로 재생성되며 admin이 설정한 아이콘/색/한글명이 유지됨.
+   */
+  public async purgeCharacters(gameSlug: string): Promise<number> {
+    const game = await prisma.game.findUnique({ where: { slug: gameSlug } });
+    if (!game) throw new Error(`Game not found: ${gameSlug}`);
+    const chars = await prisma.character.findMany({
+      where: { gameId: game.id },
+      select: { id: true },
+    });
+    const ids = chars.map((c) => c.id);
+    if (ids.length === 0) return 0;
+    await prisma.video.deleteMany({ where: { characterId: { in: ids } } });
+    const del = await prisma.character.deleteMany({ where: { id: { in: ids } } });
+    logger.warn(`Purged ${del.count} characters (+ their videos) for ${gameSlug}.`);
+    return del.count;
+  }
+
   public async syncCharacters(gameSlug: string, data: ScrapedData[]) {
     logger.info(`Syncing ${data.length} characters for ${gameSlug}...`);
 
