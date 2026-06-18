@@ -86,6 +86,107 @@ export class Reverse1999CharacterScraper extends ScraperBase {
     return teams;
   }
 
+  // 영문 월 → 한글 "M월 D일" 변환. 파싱 실패 시 원문 유지.
+  private toKoreanBirthday(raw: string): string {
+    const MONTHS: Record<string, number> = {
+      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+    };
+    const m = raw.match(/([A-Za-z]+)\s+(\d{1,2})/);
+    if (m && MONTHS[m[1].toLowerCase()]) {
+      return `${MONTHS[m[1].toLowerCase()]}월 ${parseInt(m[2], 10)}일`;
+    }
+    return raw.trim();
+  }
+
+  // fandom 인포박스 위키텍스트에서 `| key = value` 한 줄을 추출.
+  private infoboxField(wikitext: string, key: string): string {
+    const re = new RegExp(`\\|\\s*${key}\\s*=\\s*([^\\n|}]+)`, 'i');
+    const m = wikitext.match(re);
+    return m ? m[1].trim() : '';
+  }
+
+  /**
+   * reverse1999.fandom.com(MediaWiki API)에서 캐릭터 로어를 가져온다.
+   * 소스(reverse1999-simulator)에 없는 성우·생일·나이·향/매개를 보강한다.
+   * 페이지명은 engName을 대문자화해 추정하고, 없으면 graceful하게 null.
+   */
+  private readonly FANDOM_UA = 'Mozilla/5.0 (compatible; KingDuckBot/1.0)';
+
+  // fandom 위키텍스트를 받아 lore 객체로 파싱. 의미 있는 필드 없으면 null.
+  private parseFandomWikitext(wt: string): any | null {
+    if (!wt) return null;
+    const cv = {
+      kor: this.infoboxField(wt, 'cv_kor'),
+      jpn: this.infoboxField(wt, 'cv_jpn'),
+      eng: this.infoboxField(wt, 'cv_eng'),
+      zho: this.infoboxField(wt, 'cv_zho'),
+    };
+    const birthdayRaw = this.infoboxField(wt, 'birthday');
+    const lore: any = {
+      source: 'reverse1999.fandom.com',
+      cv,
+      birthday: birthdayRaw ? this.toKoreanBirthday(birthdayRaw) : '',
+      age: this.infoboxField(wt, 'age'),
+      fragrance: this.infoboxField(wt, 'fragrance'),
+      medium: this.infoboxField(wt, 'medium'),
+      nameKor: this.infoboxField(wt, 'name_kor'),
+    };
+    const hasAny = cv.kor || cv.jpn || cv.eng || cv.zho || lore.birthday || lore.age;
+    return hasAny ? lore : null;
+  }
+
+  private async fetchFandomPage(page: string): Promise<string> {
+    const url = `https://reverse1999.fandom.com/api.php?action=parse&page=${encodeURIComponent(
+      page,
+    )}&format=json&prop=wikitext`;
+    const res = await fetch(url, { headers: { 'User-Agent': this.FANDOM_UA } });
+    if (!res.ok) return '';
+    const data: any = await res.json();
+    return data?.parse?.wikitext?.['*'] || '';
+  }
+
+  /**
+   * reverse1999.fandom.com에서 캐릭터 로어(성우/생일/나이/향·매개)를 가져온다.
+   * engName(하이픈/언더스코어 표기) → 페이지명 추정. 직접 매칭 실패 시
+   * opensearch로 가장 가까운 페이지를 찾아 폴백한다. 모두 실패하면 null.
+   */
+  private async fetchFandomLore(engName: string): Promise<any | null> {
+    if (!engName) return null;
+    const cap = engName.charAt(0).toUpperCase() + engName.slice(1);
+    const titled = engName
+      .replace(/[-_]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+      .join(' ');
+
+    try {
+      // 1) 추정 페이지명 직접 시도
+      for (const page of Array.from(new Set([cap, titled, engName]))) {
+        const lore = this.parseFandomWikitext(await this.fetchFandomPage(page));
+        if (lore) return lore;
+      }
+      // 2) opensearch 폴백 — 공백 표기로 가장 가까운 페이지 제목을 찾는다.
+      const osUrl = `https://reverse1999.fandom.com/api.php?action=opensearch&search=${encodeURIComponent(
+        titled,
+      )}&limit=1&format=json`;
+      const osRes = await fetch(osUrl, { headers: { 'User-Agent': this.FANDOM_UA } });
+      if (osRes.ok) {
+        const os: any = await osRes.json();
+        const best = os?.[1]?.[0];
+        if (best) {
+          const lore = this.parseFandomWikitext(await this.fetchFandomPage(best));
+          if (lore) return lore;
+        }
+      }
+    } catch (e) {
+      logger.warn(`Fandom lore fetch failed for ${engName}: ${(e as Error).message}`);
+    }
+    return null;
+  }
+
   async scrape(options?: {
     limit?: number;
     specificId?: string;
@@ -562,6 +663,14 @@ export class Reverse1999CharacterScraper extends ScraperBase {
             };
           }
 
+          // fandom에서 로어(성우/생일/나이/향·매개) 보강. 실패해도 캐릭터 저장은 진행.
+          const lore = await this.fetchFandomLore(engName);
+          if (lore) {
+            logger.info(`Fandom lore attached: ${name} (${engName})`);
+          } else {
+            logger.warn(`Fandom lore missing: ${name} (${engName})`);
+          }
+
           results.push({
             name: name,
             sourceUrl: detailUrl,
@@ -575,6 +684,7 @@ export class Reverse1999CharacterScraper extends ScraperBase {
               element: afflatus,
               path: nextData?.role || 'damage', // Using role as Path (DamageType in user's terms)
               iconImageUrl: localIconUrl,
+              lore,
               profile: { tags: profileTags },
               efficiency,
               euphoria_info: euphoriaInfo,
