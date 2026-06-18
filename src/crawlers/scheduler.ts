@@ -8,6 +8,7 @@ import { CharacterScraper as StarRailCharacterScraper } from './scrapers/starrai
 import { LightConeScraper as StarRailLightConeScraper } from './scrapers/starrail/LightConeScraper';
 import { RelicScraper as StarRailRelicScraper } from './scrapers/starrail/RelicScraper';
 import { StarRailItemScraper } from './scrapers/starrail/ItemScraper';
+import { StarRailBuildScraper } from './scrapers/starrail/BuildScraper';
 import { EventScraper as StarRailEventScraper } from './scrapers/starrail/EventScraper';
 import { RedeemCodeScraper as StarRailRedeemCodeScraper } from './scrapers/starrail/RedeemCodeScraper';
 import { YoutubeShortsScraper } from './scrapers/starrail/YoutubeShortsScraper';
@@ -186,6 +187,16 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new YoutubeShortsScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('starrail', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'starrail',
+    type: 'build', // 추천 광추/유물(궁합) — genshin.gg/star-rail 큐레이션
+    run: async (s) => {
+      const scraper = new StarRailBuildScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('starrail', data);
       return data.length;
     },
   },
