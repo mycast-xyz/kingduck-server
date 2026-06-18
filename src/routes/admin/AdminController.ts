@@ -127,6 +127,72 @@ export class AdminController {
     }
   }
 
+  // 등급 표시 방식 저장 { mode:'stars'|'image', images:{tier:url} }.
+  async updateRarityDisplay(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.params.slug);
+      const rarityDisplay = req.body?.rarityDisplay;
+      if (rarityDisplay === undefined) {
+        res.status(400).json({ resultCode: 400, resultMsg: 'rarityDisplay가 필요합니다.' });
+        return;
+      }
+      const game = await prisma.game.findUnique({ where: { slug } });
+      if (!game) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+      const updated = await prisma.game.update({
+        where: { slug },
+        data: { rarityDisplay: rarityDisplay ?? null },
+      });
+      logger.info(`Rarity display updated: ${slug}`);
+      sendOk(res, { slug, rarityDisplay: updated.rarityDisplay });
+    } catch (error) {
+      logger.error('updateRarityDisplay Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '등급 표시 설정 저장에 실패했습니다.' });
+    }
+  }
+
+  // 등급 티어 이미지 업로드(예: 니케 SSR 뱃지) → static 저장 + rarity_display.images[tier] 갱신.
+  async uploadRarityImage(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.params.slug);
+      const tier = String(req.params.tier);
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+      const game = await prisma.game.findUnique({ where: { slug } });
+      if (!game) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+      const dir = path.join(process.cwd(), 'static', 'image', slug, 'rarity');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `${tier}.webp`));
+      const url = `assets/image/${slug}/rarity/${tier}.webp?v=${Date.now()}`;
+
+      // 기존 rarityDisplay에 images[tier] 머지(없으면 mode=image로 시작).
+      const cur = (game.rarityDisplay as { mode?: string; images?: Record<string, string> }) || {};
+      const rarityDisplay = {
+        ...cur,
+        mode: cur.mode || 'image',
+        images: { ...(cur.images || {}), [tier]: url },
+      };
+      const updated = await prisma.game.update({ where: { slug }, data: { rarityDisplay } });
+      logger.info(`Rarity image uploaded: ${slug}/${tier} → ${url}`);
+      sendOk(res, { slug, tier, url, rarityDisplay: updated.rarityDisplay });
+    } catch (error) {
+      logger.error('uploadRarityImage Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '등급 이미지 업로드에 실패했습니다.' });
+    }
+  }
+
   // 게임별 속성/특성(Element) 목록 — 어드민 아이콘 관리 화면용.
   async getElementList(req: Request, res: Response): Promise<void> {
     try {

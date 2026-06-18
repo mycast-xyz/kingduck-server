@@ -13,6 +13,7 @@ model Game {
   description String?
   iconUrl     String?  @map("icon_url")
   rarityColors Json?   @map("rarity_colors") // 등급별 카드 색상(어드민 편집). 코드 기본값 위에 머지.
+  rarityDisplay Json?  @map("rarity_display") // 등급 표시 방식 { mode:'stars'|'image', images:{tier:url} }
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

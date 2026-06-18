@@ -56,6 +56,13 @@ router.post(
 );
 // 등급별 카드 색상(JSON) 저장.
 router.put('/game/:slug/rarity-colors', AdminController.updateRarityColors);
+// 등급 표시 방식(별 반복/이미지) 저장 + 티어 이미지 업로드.
+router.put('/game/:slug/rarity-display', AdminController.updateRarityDisplay);
+router.post(
+  '/game/:slug/rarity-image/:tier',
+  iconUpload.single('file'),
+  AdminController.uploadRarityImage,
+);
 
 // 속성/특성(Element) 아이콘 + 한글명 관리 — 필터 아이콘/라벨이 DB(Element) 기반이라 여기서 채운다.
 router.get('/element/list', AdminController.getElementList);
