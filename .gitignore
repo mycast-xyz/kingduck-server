@@ -148,3 +148,7 @@ logs/
 
 # DB backups (pg_dump)
 backups/
+
+# yt-dlp 바이너리는 OS별로 다르므로 커밋하지 않음(서버는 PATH의 yt-dlp 사용)
+bin/yt-dlp
+bin/yt-dlp.exe

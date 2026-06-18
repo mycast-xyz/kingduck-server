@@ -82,16 +82,19 @@ class YoutubeUtils {
 
       const saveDirectory = path.join(__dirname, '../../static/video/');
 
-      // Check for local binary in bin directory (project root/bin/yt-dlp.exe)
-      const localBinaryPath = path.resolve(process.cwd(), 'bin', 'yt-dlp.exe');
-      let ytDlpPath = 'yt-dlp'; // Default to global path
+      // 로컬 바이너리 경로는 OS별로 다르다: Windows는 bin/yt-dlp.exe, Linux/Mac은 bin/yt-dlp.
+      // (홈서버는 Ubuntu라 .exe를 쓰면 안 됨.) 로컬 바이너리가 없으면 PATH의 전역 yt-dlp로 폴백한다
+      // → Ubuntu에선 `apt install yt-dlp` 또는 `pip install yt-dlp`로 설치돼 있어야 한다.
+      const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+      const localBinaryPath = path.resolve(process.cwd(), 'bin', binaryName);
+      let ytDlpPath = 'yt-dlp'; // PATH의 전역 yt-dlp 기본값
 
       if (fs.existsSync(localBinaryPath)) {
         logger.info(`Using local yt-dlp binary: ${localBinaryPath}`);
         ytDlpPath = localBinaryPath;
       } else {
         logger.info(
-          'Using global yt-dlp (local binary not found in bin/yt-dlp.exe)',
+          `Using global yt-dlp from PATH (local bin/${binaryName} not found)`,
         );
       }
 
