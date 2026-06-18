@@ -81,13 +81,20 @@ export class CharacterScraper extends ScraperBase {
           detail.baseType?.name || entry.baseType?.name,
         );
 
-        // 이미지: 리스트 아이콘 + 카드(스플래시)
+        // 이미지 종류:
+        //  - splashIconPath(376x512 세로 포트레이트) = 리스트 카드용 메인 이미지(원하는 형태)
+        //  - iconPath(376x512 아바타) = 포트레이트 없을 때 폴백
+        //  - artPath/figPath(2048 정사각 스플래시) = 상세 큰 이미지(cardImageUrl), 리스트엔 쓰지 않음
+        const localSplashUrl = await this.dl(
+          detail.splashIconPath || entry.splashIconPath,
+          `splash_${originalId}`,
+        );
         const localIconUrl = await this.dl(
           detail.iconPath || entry.iconPath,
           `icon_${originalId}`,
         );
         const localCardUrl = await this.dl(
-          detail.splashIconPath || detail.artPath || detail.figPath,
+          detail.artPath || detail.figPath || detail.splashIconPath,
           `card_${originalId}`,
         );
 
@@ -107,8 +114,9 @@ export class CharacterScraper extends ScraperBase {
           element: elementEn,
           path: pathEn,
           camp: detail.archive?.camp,
-          cardImageUrl: localCardUrl,
-          iconImageUrl: localIconUrl, // 작은 아이콘(376) — 필요 시 사용
+          cardImageUrl: localCardUrl, // 2048 정사각 스플래시 — 상세 큰 이미지
+          splashImageUrl: localSplashUrl, // 376x512 세로 포트레이트(리스트 메인)
+          iconImageUrl: localIconUrl, // 376x512 아바타 — 폴백
           description: detail.descHash,
           skills,
           skills_raw: detail.skills,
@@ -144,8 +152,8 @@ export class CharacterScraper extends ScraperBase {
         results.push({
           name,
           sourceUrl: detailUrl,
-          // 리스트 카드용: 고해상도 스플래시(2048, 상세 페이지 이미지) 우선. 아이콘(376)은 저해상도라 폴백.
-          imageUrl: localCardUrl || localIconUrl,
+          // 리스트 카드용: 세로 포트레이트(splashIconPath) 우선, 없으면 아이콘. artPath(2048)는 리스트에 안 씀.
+          imageUrl: localSplashUrl || localIconUrl,
           rarity,
           weaponType: pathEn, // hakush 시절 weaponType=BaseType 관행 유지
           description: detail.descHash,
