@@ -36,16 +36,6 @@ const CHAR_ALIAS: Record<string, string> = {
   topazandnumby: 'topaznumby', // "Topaz and Numby" vs SRS "Topaz & Numby"
 };
 
-// 별형(alternate form) originalId → 본체 originalId.
-// genshin.gg에 전용 페이지가 없으나 "본체와 동일 키트"라 본체 추천을 그대로 상속해도 무방한
-// 경우만 등록한다. (은랑 LV.999(1506)는 은랑(1006)과 동일 키트지만 genshin.gg에 LV.999 전용
-// 페이지가 없음.) ※ 빌드가 다른 변형(개척자 운명별 8001~8010, 3월 7일 수렵 1224)은 본체와
-//   추천이 다르므로 **의도적으로 제외** — 잘못된 빌드 복사 방지. ("LV.999" 류를 정규화로
-//   일반 흡수하면 은랑(1006)↔은랑LV.999(1506)가 충돌하므로 명시적 매핑을 쓴다.)
-const VARIANT_BUILD_INHERITS: Record<string, string> = {
-  '1506': '1006', // 은랑 LV.999 ← 은랑
-};
-
 export class StarRailBuildScraper extends ScraperBase {
   constructor() {
     super('starrail');
@@ -204,31 +194,6 @@ export class StarRailBuildScraper extends ScraperBase {
       logger.warn(
         `[SR-Build] 유물 매핑 실패 ${unmappedRelic.size}: ${[...unmappedRelic].join(', ')}`,
       );
-
-    // 별형 빌드 상속 — 본체가 채워졌고 별형이 아직 비어 있으면 본체 추천을 복사한다.
-    const filledById = new Map(
-      results.map((r) => [String((r.metadata as any).originalId), r]),
-    );
-    for (const [variantId, baseId] of Object.entries(VARIANT_BUILD_INHERITS)) {
-      if (filledById.has(variantId)) continue; // 이미 자체 데이터로 채워짐
-      const base = filledById.get(baseId);
-      const variant = dbCharMap.get(variantId);
-      if (!base || !variant) continue;
-      const baseMeta = base.metadata as any;
-      const metadata = {
-        ...variant.metadata,
-        originalId: variantId,
-        lightcones: baseMeta.lightcones || variant.metadata.lightcones || [],
-        relics: baseMeta.relics || variant.metadata.relics || {},
-        teams: variant.metadata.teams || [],
-        recommendedSource: 'genshin.gg',
-      };
-      results.push({ name: variant.name, sourceUrl: base.sourceUrl, metadata });
-      matched++;
-      logger.info(
-        `[SR-Build] 별형 상속 ${variant.name} (${variantId}) <- 본체 ${baseId}`,
-      );
-    }
 
     if (results.length === 0) {
       throw new Error(
