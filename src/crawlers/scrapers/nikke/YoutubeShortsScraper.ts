@@ -96,6 +96,10 @@ export class YoutubeShortsScraper extends ScraperBase {
         const title: string = video.snippet?.title || '';
         if (!videoId || !title) continue;
 
+        // 우리가 수집할 3종만: 코스튬 소개 / 프로필 / 모션 뷰. 그 외(PV/OST 등)는 건너뜀.
+        const videoType = this.classifyType(title);
+        if (!videoType) continue;
+
         const matchedName = this.matchCharacter(title, names);
         if (!matchedName) continue;
 
@@ -112,9 +116,9 @@ export class YoutubeShortsScraper extends ScraperBase {
           url,
           thumbnailUrl: thumbnail,
           characterName: matchedName,
-          type: 'KeyVisual',
+          type: videoType,
         });
-        logger.info(`Found Shorts: ${title} (Matched: ${matchedName}, ${durationSeconds}s)`);
+        logger.info(`Found Shorts: ${title} (Matched: ${matchedName}, ${videoType}, ${durationSeconds}s)`);
       }
 
       logger.info(`Scraped ${results.length} Nikke Shorts via API`);
@@ -123,6 +127,19 @@ export class YoutubeShortsScraper extends ScraperBase {
     }
 
     return results;
+  }
+
+  /**
+   * @nikkekr 제목으로 영상 종류 분류 — 우리가 수집할 3종만.
+   * 예) "NIKKE 코스튬 소개 - 프리바티 | ..." / "NIKKE 프로필 - ... | ..." / "NIKKE 모션 VIEW - ... | ..."
+   * 해당 없으면 null(PV/OST 등 제외).
+   */
+  private classifyType(title: string): string | null {
+    const t = title.normalize('NFC');
+    if (/코스튬\s*소개/.test(t)) return '코스튬 소개';
+    if (/프로필/.test(t)) return '프로필';
+    if (/모션\s*(뷰|view)/i.test(t)) return '모션 뷰';
+    return null;
   }
 
   /** 제목에 포함된 DB 캐릭터명 중 가장 긴 것을 반환(부분일치 오매칭 방지). names는 길이 내림차순. */
