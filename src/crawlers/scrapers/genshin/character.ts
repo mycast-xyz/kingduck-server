@@ -34,6 +34,15 @@ const WEAPON_TYPE_MAP: Record<string, string> = {
   WEAPON_CATALYST: 'Catalyst',
 };
 
+// 무기타입(Path) → Ambr 무기타입 아이콘 자산 접미(UI_GachaTypeIcon_*). Polearm만 'Pole'.
+const WEAPON_ICON_ASSET: Record<string, string> = {
+  Sword: 'Sword',
+  Claymore: 'Claymore',
+  Polearm: 'Pole',
+  Bow: 'Bow',
+  Catalyst: 'Catalyst',
+};
+
 const AMBR_BASE = 'https://gi.yatta.moe';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -119,6 +128,15 @@ export class GenshinCharacterScraper extends ScraperBase {
               'element',
             )
           : null;
+        // 무기타입 아이콘(Path 필터) — Ambr UI_GachaTypeIcon_{Sword|Claymore|Pole|Bow|Catalyst}.png.
+        const weaponAsset = WEAPON_ICON_ASSET[weaponKey];
+        const localPathIconUrl = weaponAsset
+          ? await this.dlIcon(
+              `UI_GachaTypeIcon_${weaponAsset}`,
+              `path_${weaponKey}`,
+              'element',
+            )
+          : null;
 
         // 상세 raw(콘텐츠 상세용 — 추후 genshin 뷰모델에서 가공)
         const description =
@@ -138,6 +156,7 @@ export class GenshinCharacterScraper extends ScraperBase {
           element,
           elementIconUrl: localElementIconUrl, // DataSyncService가 Element(DamageType).iconUrl로 적재
           path: weaponKey,
+          pathIconUrl: localPathIconUrl, // Element(Path).iconUrl로 적재
           weaponType: weaponKey,
           region,
           birthday: d.birthday ?? entry.birthday ?? null,
