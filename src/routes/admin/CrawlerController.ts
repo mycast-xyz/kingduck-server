@@ -248,21 +248,40 @@ export class CrawlerController {
         return;
       }
 
-      // 3. 중복 실행 방지 — 이미 RUNNING 상태인 크롤러 거부
+      // 3. 중복 실행 방지 — 단, 오래된 RUNNING은 죽은 크롤(프로세스 OOM/재시작/강제종료로
+      //    .then/.catch가 못 돌아 status가 RUNNING인 채 영구히 남은 잔여물)로 보고 자동 정리한다.
+      //    (이게 없으면 한 번 죽은 크롤이 해당 게임/타입을 영원히 409로 막는다.)
+      const STALE_RUNNING_MS = 60 * 60 * 1000; // 60분 — 정상 크롤은 이 안에 끝난다고 가정
       const runningLog = await prisma.crawlerLog.findFirst({
         where: {
           gameId: game.id,
           crawlerType,
           status: CrawlerStatus.RUNNING,
         },
+        orderBy: { startTime: 'desc' },
       });
 
       if (runningLog) {
-        res.status(409).json({
-          resultCode: 409,
-          resultMsg: '이미 실행 중입니다.',
+        const ageMs = Date.now() - new Date(runningLog.startTime).getTime();
+        if (ageMs < STALE_RUNNING_MS) {
+          res.status(409).json({
+            resultCode: 409,
+            resultMsg: '이미 실행 중입니다.',
+          });
+          return;
+        }
+        // 오래된 RUNNING → 죽은 것으로 간주, FAILED로 정리하고 새 실행 진행
+        await prisma.crawlerLog.update({
+          where: { id: runningLog.id },
+          data: {
+            status: CrawlerStatus.FAILED,
+            endTime: new Date(),
+            errorMsg: `오래된 RUNNING 자동 정리(프로세스 중단 추정, ${Math.round(ageMs / 60000)}분 경과)`,
+          },
         });
-        return;
+        logger.warn(
+          `Stale RUNNING log cleared: ${gameSlug}/${crawlerType} (${Math.round(ageMs / 60000)}m old)`,
+        );
       }
 
       // 4. 실행 (비동기)
