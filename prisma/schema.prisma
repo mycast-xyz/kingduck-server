@@ -12,6 +12,7 @@ model Game {
   name        String
   description String?
   iconUrl     String?  @map("icon_url")
+  rarityColors Json?   @map("rarity_colors") // 등급별 카드 색상(어드민 편집). 코드 기본값 위에 머지.
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

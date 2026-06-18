@@ -101,6 +101,32 @@ export class AdminController {
     }
   }
 
+  // 게임 등급별 카드 색상 저장(JSON). 코드 기본값 위에 머지되어 리스트 카드에 반영.
+  async updateRarityColors(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.params.slug);
+      const rarityColors = req.body?.rarityColors;
+      if (rarityColors === undefined) {
+        res.status(400).json({ resultCode: 400, resultMsg: 'rarityColors가 필요합니다.' });
+        return;
+      }
+      const game = await prisma.game.findUnique({ where: { slug } });
+      if (!game) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+      const updated = await prisma.game.update({
+        where: { slug },
+        data: { rarityColors: rarityColors ?? null },
+      });
+      logger.info(`Rarity colors updated: ${slug}`);
+      sendOk(res, { slug, rarityColors: updated.rarityColors });
+    } catch (error) {
+      logger.error('updateRarityColors Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '등급 색상 저장에 실패했습니다.' });
+    }
+  }
+
   // 게임별 속성/특성(Element) 목록 — 어드민 아이콘 관리 화면용.
   async getElementList(req: Request, res: Response): Promise<void> {
     try {
