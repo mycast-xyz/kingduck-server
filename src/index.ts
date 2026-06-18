@@ -3,6 +3,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 
 // DB ORM 참조
 import { config } from './config/config';
@@ -52,6 +53,9 @@ const whitelist: string[] = [
         .filter(Boolean)
     : []),
 ];
+
+// 응답 gzip 압축 — JSON(목록/상세) 전송량 추가 절감. 정적 이미지는 이미 압축돼 있어 영향 적음.
+app.use(compression());
 
 // 보안 헤더: helmet 기본값 적용. CSP는 swagger UI(/api-docs)를 깨뜨릴 수 있어 비활성화.
 // CORP는 cross-origin 허용: /assets의 공개 이미지(로고·캐릭터)를 다른 origin(프론트)에서
