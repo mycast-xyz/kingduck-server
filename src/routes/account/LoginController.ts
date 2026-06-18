@@ -23,7 +23,7 @@ export class LoginController {
       const loginResult = await Login.processLogin(
         password,
         user.password,
-        user.email,
+        user.id, // 토큰 userId = 숫자 PK(authorize가 where:{id}로 조회). 기존엔 email을 넣어 401 발생.
         user.name,
         user.uuid,
         user.role,

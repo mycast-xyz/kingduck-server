@@ -26,7 +26,7 @@ export class Login {
   public async processLogin(
     inputPassword: string,
     storedPassword: string,
-    userId: string,
+    userId: number,
     userName: string,
     userUUID: string,
     role: string,

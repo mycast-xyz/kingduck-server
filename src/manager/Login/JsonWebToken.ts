@@ -3,7 +3,7 @@ import { config } from '../../config/config';
 const secretKey = config.JWT_SECRET_KEY;
 
 interface TokenPayload {
-  userId: string;
+  userId: number; // 숫자 PK(User.id). authorize 미들웨어가 where:{id}로 조회.
   role: string; // Changed from isAdmin
   userName: string;
   userUUID: string;
