@@ -3,6 +3,9 @@ import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
 import { sendOk } from '../../utils/responseBuilder';
 import { clampPage, clampLimit } from '../../utils/pagination';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 
 export class AdminController {
   /**
@@ -54,6 +57,47 @@ export class AdminController {
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
       });
+    }
+  }
+
+  /**
+   * 게임 아이콘 업로드/교체
+   * POST /api/v0/admin/game/:slug/icon  (multipart/form-data, field: file)
+   * 업로드 이미지를 webp로 변환해 static/logo/{slug}.webp 에 덮어쓰고 icon_url 을 갱신한다.
+   * 같은 파일명이라 캐시 무효화를 위해 icon_url 에 ?v=timestamp 를 붙인다.
+   */
+  async uploadGameIcon(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.params.slug);
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+
+      const game = await prisma.game.findUnique({ where: { slug } });
+      if (!game) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+
+      // static/logo/{slug}.webp 로 저장(express '/assets' → 'static' 매핑과 일치).
+      const dir = path.join(process.cwd(), 'static', 'logo');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `${slug}.webp`));
+
+      // 캐시 무효화용 버전 쿼리.
+      const iconUrl = `assets/logo/${slug}.webp?v=${Date.now()}`;
+      const updated = await prisma.game.update({ where: { slug }, data: { iconUrl } });
+      logger.info(`Game icon updated: ${slug} → ${iconUrl}`);
+      sendOk(res, { slug, iconUrl: updated.iconUrl });
+    } catch (error) {
+      logger.error('uploadGameIcon Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '아이콘 업로드에 실패했습니다.' });
     }
   }
   /**

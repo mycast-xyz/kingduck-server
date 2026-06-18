@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import AdminController from './AdminController';
 import CrawlerController from './CrawlerController';
 import SystemStatsController from './SystemStatsController';
@@ -6,6 +7,12 @@ import UserManagementController from './UserManagementController';
 import { authorize } from '../../middleware/auth';
 
 const router = express.Router();
+
+// 게임 아이콘 업로드 — 메모리 저장(sharp가 버퍼를 webp 변환), 3MB 제한.
+const iconUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+});
 
 // 모든 Admin 라우트는 ADMIN/MANAGER 권한 필요.
 // recheckDb: 어드민은 민감 작업이라 매 요청 DB에서 role/밴 상태를 재확인(강등/밴 즉시 반영, B-S6).
@@ -28,6 +35,25 @@ router.use(authorize(['ADMIN', 'MANAGER'], { recheckDb: true }));
  *         description: 권한 없음
  */
 router.get('/game/list', AdminController.getGameList);
+
+/**
+ * @swagger
+ * /api/v0/admin/game/{slug}/icon:
+ *   post:
+ *     summary: 게임 아이콘 업로드/교체
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     consumes: [multipart/form-data]
+ *     responses:
+ *       200:
+ *         description: 업로드 성공(갱신된 iconUrl 반환)
+ */
+router.post(
+  '/game/:slug/icon',
+  iconUpload.single('file'),
+  AdminController.uploadGameIcon,
+);
 
 /**
  * @swagger
