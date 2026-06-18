@@ -439,20 +439,37 @@ async function runCrawlers() {
           continue;
         }
 
-        // 중복 실행 방지 — 이미 RUNNING 상태인 크롤러는 스킵
+        // 중복 실행 방지 — 단, 오래된 RUNNING은 죽은 크롤(프로세스 중단으로 status가 RUNNING인 채
+        // 남은 잔여물)로 보고 자동 정리한다. 안 그러면 한 번 죽은 크롤이 영원히 스킵된다.
+        const STALE_RUNNING_MS = 60 * 60 * 1000; // 60분
         const existingRunning = await prisma.crawlerLog.findFirst({
           where: {
             gameId: game.id,
             crawlerType: task.type,
             status: CrawlerStatus.RUNNING,
           },
+          orderBy: { startTime: 'desc' },
         });
 
         if (existingRunning) {
+          const ageMs = Date.now() - new Date(existingRunning.startTime).getTime();
+          if (ageMs < STALE_RUNNING_MS) {
+            logger.warn(
+              `Task [${task.game}] ${task.type} is already running (log ID: ${existingRunning.id}), skipping.`,
+            );
+            continue;
+          }
+          await prisma.crawlerLog.update({
+            where: { id: existingRunning.id },
+            data: {
+              status: CrawlerStatus.FAILED,
+              endTime: new Date(),
+              errorMsg: `오래된 RUNNING 자동 정리(프로세스 중단 추정, ${Math.round(ageMs / 60000)}분)`,
+            },
+          });
           logger.warn(
-            `Task [${task.game}] ${task.type} is already running (log ID: ${existingRunning.id}), skipping.`,
+            `Task [${task.game}] ${task.type}: stale RUNNING log #${existingRunning.id} cleared (${Math.round(ageMs / 60000)}m old).`,
           );
-          continue;
         }
 
         // Create log entry (RUNNING)
