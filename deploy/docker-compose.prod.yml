@@ -44,11 +44,10 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    # Cloudflare Tunnel이 공개 HTTPS를 종단 → Caddy는 평문 HTTP :80만 노출(443 불필요).
+    # cloudflared ingress가 http://localhost:80 으로 향하게 한다.
     ports:
       - '80:80'
-      - '443:443'
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ../../kingduck/build:/srv/web:ro # 프론트 빌드 산출물(adapter-static)
