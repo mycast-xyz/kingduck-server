@@ -1,6 +1,7 @@
 import { Browser } from '../../core/Browser';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { ImageDownloader } from '../../utils/ImageDownloader';
 
 /**
  * 니케 캐릭터 상세 enrichment 스크래퍼 — blablalink(SHIFT UP 공식 한국어).
@@ -161,12 +162,41 @@ export class BlablalinkDetailScraper {
         let cv = cvParts.join(' / ');
         if (!cv && d.cv_localkey && d.cv_localkey !== '-') cv = d.cv_localkey;
 
-        // costumes (이름/설명/등급만; 이미지 v1 생략)
-        const costumes = (d.character_costume_list || []).map((c: any) => ({
-          name: c.costume_name_locale || '',
-          description: c.costume_description_locale || '',
-          grade: c.costume_grade_id || '',
-        }));
+        // costumes — 캐릭터 아트 swiper의 img alt="{res}_{costumeId}_{idx}" → costumeId별 이미지 src.
+        // (코스튬 JSON엔 이미지 URL이 없고, 해시 CDN 경로라 DOM에서 alt로 식별해 매핑한다.)
+        const costumeImgMap: Record<string, string> = await page.evaluate(() => {
+          const map: Record<string, string> = {};
+          document.querySelectorAll('img').forEach((node) => {
+            const im = node as HTMLImageElement;
+            const m = (im.alt || '').match(/^\d+_(\d+)_\d+$/);
+            if (m && /sg-tools-cdn/.test(im.src) && !map[m[1]]) map[m[1]] = im.src;
+          });
+          return map;
+        });
+        const costumes: Array<{
+          name: string;
+          desc: string;
+          grade: string;
+          image?: string;
+        }> = [];
+        for (const c of d.character_costume_list || []) {
+          const imgUrl = costumeImgMap[String(c.id)];
+          let image: string | null = null;
+          if (imgUrl) {
+            image = await ImageDownloader.downloadAndSave(
+              imgUrl,
+              'nikke',
+              'costume',
+              `costume_${resourceId}_${c.id}`,
+            );
+          }
+          costumes.push({
+            name: c.costume_name_locale || '',
+            desc: c.costume_description_locale || '',
+            grade: c.costume_grade_id || '',
+            ...(image ? { image } : {}),
+          });
+        }
 
         // stats — 레벨 리스트의 마지막 값 = 만렙.
         const atk = d.character_level_attack_list || [];
