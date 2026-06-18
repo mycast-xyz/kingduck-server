@@ -27,6 +27,7 @@ import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsS
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { NikkeCharacterScraper } from './scrapers/nikke/CharacterScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
+import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -351,6 +352,18 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new NikkeYoutubeShortsScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('nikke', data);
+      return data.length;
+    },
+  },
+
+  // --- 젠레스 존 제로(ZZZ) ---
+  {
+    game: 'zzz',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new ZzzCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('zzz', data);
       return data.length;
     },
   },
