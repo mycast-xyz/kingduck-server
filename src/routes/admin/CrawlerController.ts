@@ -301,18 +301,20 @@ export class CrawlerController {
         },
       });
 
-      // 백그라운드 실행
+      // 백그라운드 실행. 이 태스크의 데이터 공백 요약만 기록되도록 리셋.
+      syncService.lastSyncGaps = null;
       task
         .run(syncService)
         .then(async (itemsFound) => {
           logger.info(`Manual task [${gameSlug}] ${crawlerType} completed.`);
-          // 완료 로그 업데이트
+          // 완료 로그 업데이트(데이터 공백 요약을 metadata에 기록 → 로그 상세 모달 노출).
           await prisma.crawlerLog.update({
             where: { id: crawlerLog.id },
             data: {
               status: CrawlerStatus.SUCCESS,
               endTime: new Date(),
               itemsFound: itemsFound || 0,
+              metadata: syncService.lastSyncGaps ?? undefined,
             },
           });
         })

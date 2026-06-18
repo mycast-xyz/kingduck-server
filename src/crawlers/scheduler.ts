@@ -506,15 +506,18 @@ async function runCrawlers() {
         });
 
         try {
+          // 이 태스크의 데이터 공백 요약만 기록되도록 리셋(캐릭터 sync가 없는 태스크는 null 유지).
+          syncService.lastSyncGaps = null;
           const itemsFound = await task.run(syncService);
 
-          // Update log entry (SUCCESS)
+          // Update log entry (SUCCESS) — 데이터 공백 요약을 metadata에 기록(로그 상세 모달 노출).
           await prisma.crawlerLog.update({
             where: { id: crawlerLog.id },
             data: {
               status: CrawlerStatus.SUCCESS,
               endTime: new Date(),
               itemsFound: itemsFound || 0,
+              metadata: syncService.lastSyncGaps ?? undefined,
             },
           });
 

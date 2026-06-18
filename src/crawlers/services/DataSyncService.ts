@@ -70,6 +70,50 @@ export class DataSyncService {
     return del.count;
   }
 
+  /** 마지막 syncCharacters의 데이터 공백 요약. 스케줄러가 crawler_log.metadata에 기록 → 로그 상세 모달에 노출. */
+  public lastSyncGaps: {
+    gapCount: number;
+    byKey: Record<string, number>;
+    items: { name: string; originalId: string; missing: string[] }[];
+  } | null = null;
+
+  private static readonly GAMES_WITH_SKILLS = [
+    'genshin',
+    'starrail',
+    'nikke',
+    'wutheringwaves',
+    'zzz',
+  ];
+  private static readonly GAMES_WITH_BUILD = ['genshin', 'starrail'];
+
+  /**
+   * 크롤 시점에 "기대되는 데이터가 비었는지" 감지 → 공백 키 배열(image/skills/recommendations).
+   * 정상 공백(MC=여행자/개척자/방랑자)은 제외해 노이즈 방지. 채워지면 빈 배열이 되어 자동 해제.
+   * → 신캐처럼 소스가 아직 안 채운 데이터를 "나중에 재크롤 필요"로 자동 표시.
+   */
+  private detectGaps(
+    gameSlug: string,
+    name: string,
+    imageUrl: string | null | undefined,
+    meta: Record<string, any>,
+  ): string[] {
+    const gaps: string[] = [];
+    if (!imageUrl) gaps.push('image');
+    if (DataSyncService.GAMES_WITH_SKILLS.includes(gameSlug)) {
+      const skills = meta?.skills;
+      if (!Array.isArray(skills) || skills.length === 0) gaps.push('skills');
+    }
+    const isMc = /개척자|여행자|방랑자|trailblazer|traveler/i.test(name || '');
+    if (DataSyncService.GAMES_WITH_BUILD.includes(gameSlug) && !isMc) {
+      const hasRec =
+        (Array.isArray(meta?.recommendedWeapons) &&
+          meta.recommendedWeapons.length > 0) ||
+        (Array.isArray(meta?.lightcones) && meta.lightcones.length > 0);
+      if (!hasRec) gaps.push('recommendations');
+    }
+    return gaps;
+  }
+
   public async syncCharacters(gameSlug: string, data: ScrapedData[]) {
     logger.info(`Syncing ${data.length} characters for ${gameSlug}...`);
 
@@ -82,6 +126,8 @@ export class DataSyncService {
 
     let successCount = 0;
     let errorCount = 0;
+    const gapItems: { name: string; originalId: string; missing: string[] }[] =
+      [];
 
     // Element를 선로딩한 리졸버로 캐릭터마다의 find 쿼리(N+1)를 제거(B-H5).
     const resolveElement = await this.createElementResolver(game.id);
@@ -137,6 +183,21 @@ export class DataSyncService {
             }
           }
 
+          // 데이터 공백 감지 → metadata.dataGaps(채워지면 빈 배열로 자동 해제) + 요약 누적.
+          // imageUrl은 빌드 크롤처럼 이미지를 안 싣는 부분 크롤이 있으므로 기존 값으로 폴백(오탐 방지).
+          merged.dataGaps = this.detectGaps(
+            gameSlug,
+            item.name,
+            item.imageUrl ?? existing.imageUrl,
+            merged,
+          );
+          if (merged.dataGaps.length)
+            gapItems.push({
+              name: item.name,
+              originalId: String(originalId),
+              missing: merged.dataGaps,
+            });
+
           // Update existing character
           await prisma.character.update({
             where: { id: existing.id },
@@ -158,6 +219,23 @@ export class DataSyncService {
           });
           logger.info(`Updated character: ${item.name} (ID: ${originalId})`);
         } else {
+          // 데이터 공백 감지 → metadata.dataGaps + 요약 누적.
+          const createMeta: Record<string, any> = {
+            ...((item.metadata as Record<string, any>) || {}),
+          };
+          createMeta.dataGaps = this.detectGaps(
+            gameSlug,
+            item.name,
+            item.imageUrl,
+            createMeta,
+          );
+          if (createMeta.dataGaps.length)
+            gapItems.push({
+              name: item.name,
+              originalId: String(originalId),
+              missing: createMeta.dataGaps,
+            });
+
           // Create new character
           await prisma.character.create({
             data: {
@@ -173,7 +251,7 @@ export class DataSyncService {
               imageUrl: item.imageUrl,
               elementId,
               pathId,
-              metadata: item.metadata,
+              metadata: createMeta,
             },
           });
           logger.info(`Created character: ${item.name} (ID: ${originalId})`);
@@ -188,6 +266,24 @@ export class DataSyncService {
     logger.info(
       `Sync complete for ${gameSlug}. Success: ${successCount}, Errors: ${errorCount}`,
     );
+
+    // 데이터 공백 요약 — 스케줄러가 crawler_log.metadata에 기록(로그 상세 모달에 노출).
+    const byKey: Record<string, number> = {};
+    for (const g of gapItems)
+      for (const k of g.missing) byKey[k] = (byKey[k] || 0) + 1;
+    this.lastSyncGaps = {
+      gapCount: gapItems.length,
+      byKey,
+      items: gapItems.slice(0, 100), // 과대 방지(상위 100)
+    };
+    if (gapItems.length)
+      logger.warn(
+        `[gap] ${gameSlug}: ${gapItems.length} chars need re-crawl later (${Object.entries(
+          byKey,
+        )
+          .map(([k, v]) => `${k}:${v}`)
+          .join(', ')})`,
+      );
   }
 
   /**
