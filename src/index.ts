@@ -116,8 +116,15 @@ app.use(bodyParser.json());
 // parse requests of content-type - application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// 이미지 영상 처리
-app.use('/assets', express.static(path.join(__dirname, '../static')));
+// 이미지/영상 정적 서빙. 캐릭터 이미지는 사실상 불변, 게임 아이콘은 ?v= 캐시버스팅이 있어
+// 장기 캐시가 안전하다. (기본 max-age=0 → 네비마다 304 재검증 왕복 제거)
+app.use(
+  '/assets',
+  express.static(path.join(__dirname, '../static'), {
+    maxAge: '30d',
+    immutable: true,
+  }),
+);
 
 import { setupSwagger } from './utils/swagger';
 setupSwagger(app);

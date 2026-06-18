@@ -32,10 +32,25 @@ export const getCharacterList = async (
     },
     orderBy: { id: 'asc' },
     take: MAX_LIST,
-    include: {
-      game: true,
+    // 리스트 카드는 이름/아이콘/등급/속성만 쓴다. 무거운 metadata(캐릭당 ~100KB)·description은
+    // 목록에서 제외하고(상세 getCharacter에서만 반환) 카드 필드 + 관계만 select.
+    // (명조 list 7.7MB → ~50KB) — 상세 진입은 단건이라 영향 없음.
+    select: {
+      id: true,
+      gameId: true,
+      elementId: true,
+      pathId: true,
+      name: true,
+      rarity: true,
+      weaponType: true,
+      role: true,
+      originalId: true,
+      imageUrl: true,
+      createdAt: true,
+      updatedAt: true,
       element: true,
       path: true,
+      game: true,
     },
   });
   return results.map(withOriginalId);
