@@ -27,6 +27,7 @@ import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsS
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { BlablalinkCharacterScraper } from './scrapers/nikke/BlablalinkCharacterScraper';
 import { BlablalinkIconScraper } from './scrapers/nikke/BlablalinkIconScraper';
+import { BlablalinkDetailScraper } from './scrapers/nikke/BlablalinkDetailScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
@@ -356,6 +357,17 @@ export const CRAWLER_TASKS: ScraperTask[] = [
     run: async (s) => {
       const scraper = new BlablalinkIconScraper();
       return await scraper.syncIcons();
+    },
+  },
+  {
+    game: 'nikke',
+    type: 'detail',
+    // 캐릭터 상세 enrichment — blablalink 상세 페이지(per resourceId)를 렌더해 스킬/스토리/CV/
+    // 코스튬/스탯을 캐릭터 metadata에 read-merge한다(기존 데이터 보존). 렌더가 191건이라 느림.
+    // 테스트는 env NIKKE_DETAIL_LIMIT로 건수 제한 가능.
+    run: async (s) => {
+      const scraper = new BlablalinkDetailScraper();
+      return await scraper.enrich();
     },
   },
   {
