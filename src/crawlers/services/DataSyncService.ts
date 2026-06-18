@@ -25,14 +25,25 @@ export class DataSyncService {
     return async (
       name: string | undefined | null,
       type: string,
+      iconUrl?: string | null,
     ): Promise<number | null> => {
       if (!name) return null;
       const key = keyOf(name, type);
       const cached = cache.get(key);
-      if (cached !== undefined) return cached;
+      if (cached !== undefined) {
+        // 스크래퍼가 아이콘을 주고 기존 행 아이콘이 비어있으면 채운다(서버 크롤로 속성 아이콘 적재).
+        // 이미 값이 있으면(어드민 수동 설정 등) 덮지 않는다.
+        if (iconUrl) {
+          await prisma.element.updateMany({
+            where: { id: cached, OR: [{ iconUrl: null }, { iconUrl: '' }] },
+            data: { iconUrl },
+          });
+        }
+        return cached;
+      }
 
       const created = await prisma.element.create({
-        data: { gameId, name, type },
+        data: { gameId, name, type, iconUrl: iconUrl || null },
       });
       cache.set(key, created.id);
       logger.info(`Created new ${type}: ${name}`);
@@ -88,8 +99,13 @@ export class DataSyncService {
         const elementId = await resolveElement(
           item.metadata?.element,
           'DamageType',
+          item.metadata?.elementIconUrl, // 스크래퍼가 주면 Element.iconUrl 적재(빈 경우만)
         );
-        const pathId = await resolveElement(item.metadata?.path, 'Path');
+        const pathId = await resolveElement(
+          item.metadata?.path,
+          'Path',
+          item.metadata?.pathIconUrl,
+        );
 
         // 인덱스 컬럼 기반 매칭(B-H4b). originalId는 위에서 non-null 확인됨.
         const existing = await prisma.character.findFirst({

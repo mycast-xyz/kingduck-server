@@ -97,6 +97,18 @@ export class CharacterScraper extends ScraperBase {
           detail.artPath || detail.figPath || detail.splashIconPath,
           `card_${originalId}`,
         );
+        // 속성/운명의 길 아이콘(필터용) — 소스가 damageType/baseType.iconPath로 제공.
+        // 속성별 1개 파일로 저장(elementEn/pathEn 키) → DataSyncService가 Element.iconUrl에 적재(빈 경우만).
+        const elementIconUrl = await this.dl(
+          detail.damageType?.iconPath || entry.damageType?.iconPath,
+          `element_${elementEn}`,
+          'element',
+        );
+        const pathIconUrl = await this.dl(
+          detail.baseType?.iconPath || entry.baseType?.iconPath,
+          `path_${pathEn}`,
+          'element',
+        );
 
         // 가공
         const skills = await this.processSkills(detail.skills, originalId);
@@ -113,6 +125,8 @@ export class CharacterScraper extends ScraperBase {
           rarity,
           element: elementEn,
           path: pathEn,
+          elementIconUrl, // DataSyncService가 Element(DamageType).iconUrl로 적재
+          pathIconUrl, // Element(Path).iconUrl로 적재
           camp: detail.archive?.camp,
           cardImageUrl: localCardUrl, // 2048 정사각 스플래시 — 상세 큰 이미지
           splashImageUrl: localSplashUrl, // 376x512 세로 포트레이트(리스트 메인)
