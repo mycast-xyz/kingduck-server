@@ -25,6 +25,7 @@ import { EndfieldEquipmentScraper } from './scrapers/endfield/EquipmentScraper';
 import { EndfieldItemScraper } from './scrapers/endfield/ItemScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
+import { NikkeCharacterScraper } from './scrapers/nikke/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -327,6 +328,18 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new EndfieldEventScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await scraper.save(data);
+      return data.length;
+    },
+  },
+
+  // --- 승리의 여신: NIKKE ---
+  {
+    game: 'nikke',
+    type: 'character',
+    run: async (s) => {
+      const scraper = new NikkeCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('nikke', data);
       return data.length;
     },
   },
