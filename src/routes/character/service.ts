@@ -1,4 +1,5 @@
 import { prisma } from '../../utils/prisma';
+import { Prisma } from '@prisma/client';
 
 // B-H2: 공개 목록 무제한 로드 방지. 게임 1종당 캐릭터/속성 수는 수백 이하이므로
 // 1000으로 충분하나, 초과 시 조용히 잘림(silent truncation) — 필터를 사용할 것.
@@ -53,7 +54,33 @@ export const getCharacterList = async (
       game: true,
     },
   });
-  return results.map(withOriginalId);
+
+  // metadata에서 class/corp/burst 3필드만 JSON path 추출 (full metadata 로드 금지 — 성능).
+  // 니케 외 게임도 동일 쿼리를 실행하지만 값이 없으면 null을 반환하므로 영향 없음.
+  type MetaRow = { id: number | bigint; class: string | null; corp: string | null; burst: string | null };
+  const metaRows = await prisma.$queryRaw<MetaRow[]>(
+    Prisma.sql`
+      SELECT id,
+        metadata->>'class' AS "class",
+        metadata->>'corp'  AS "corp",
+        metadata->>'burst' AS "burst"
+      FROM characters
+      WHERE game_id = (SELECT id FROM games WHERE slug = ${gameSlug})
+      ORDER BY id ASC
+      LIMIT ${MAX_LIST}
+    `
+  );
+  const metaMap = new Map(metaRows.map((m) => [Number(m.id), m]));
+
+  return results.map((r) => {
+    const meta = metaMap.get(r.id);
+    return {
+      ...withOriginalId(r),
+      class: meta?.class ?? null,
+      corp: meta?.corp ?? null,
+      burst: meta?.burst ?? null,
+    };
+  });
 };
 
 export const getCharacter = async (gameSlug: string, id: number) => {
