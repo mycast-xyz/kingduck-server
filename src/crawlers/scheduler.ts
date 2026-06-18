@@ -27,6 +27,7 @@ import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsS
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { NikkeCharacterScraper } from './scrapers/nikke/CharacterScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
+import { NikkeBlablalinkImageScraper } from './scrapers/nikke/BlablalinkImageScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
@@ -353,6 +354,15 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('nikke', data);
       return data.length;
+    },
+  },
+  {
+    game: 'nikke',
+    type: 'image',
+    // blablalink 공식 포트레이트로 image_url 보강(저해상도 fandom 아이콘 대체). 이미지 전용.
+    run: async () => {
+      const scraper = new NikkeBlablalinkImageScraper();
+      return await scraper.run();
     },
   },
 
