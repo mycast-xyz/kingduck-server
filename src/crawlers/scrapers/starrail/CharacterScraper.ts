@@ -71,7 +71,8 @@ export class CharacterScraper extends ScraperBase {
         const detailUrl = `${this.DETAIL_BASE}/${pageId}`;
         const detail = await fetchPageConfig(detailUrl);
 
-        const name = detail.name || entry.name || `Char_${originalId}`;
+        // SRS 이름에 <nobr> 등 HTML 태그가 섞여 옴(예: "은랑 LV.<nobr>999</nobr>") → 태그 제거.
+        const name = this.stripHtml(detail.name || entry.name || `Char_${originalId}`);
         const rarity = detail.rarity ?? entry.rarity ?? 4;
         const elementEn = mapDamageTypeToEn(
           detail.damageType?.name || entry.damageType?.name,
@@ -107,6 +108,7 @@ export class CharacterScraper extends ScraperBase {
           path: pathEn,
           camp: detail.archive?.camp,
           cardImageUrl: localCardUrl,
+          iconImageUrl: localIconUrl, // 작은 아이콘(376) — 필요 시 사용
           description: detail.descHash,
           skills,
           skills_raw: detail.skills,
@@ -142,7 +144,8 @@ export class CharacterScraper extends ScraperBase {
         results.push({
           name,
           sourceUrl: detailUrl,
-          imageUrl: localIconUrl,
+          // 리스트 카드용: 고해상도 스플래시(2048, 상세 페이지 이미지) 우선. 아이콘(376)은 저해상도라 폴백.
+          imageUrl: localCardUrl || localIconUrl,
           rarity,
           weaponType: pathEn, // hakush 시절 weaponType=BaseType 관행 유지
           description: detail.descHash,
@@ -165,6 +168,14 @@ export class CharacterScraper extends ScraperBase {
       );
     }
     return results;
+  }
+
+  // SRS 이름의 HTML 태그(<nobr> 등) 제거 + 공백 정리.
+  private stripHtml(s: string): string {
+    return (s || '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async dl(
