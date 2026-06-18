@@ -35,13 +35,17 @@ async function sweepStaleCrawlerLogs(): Promise<void> {
 }
 
 const app = express();
-const port = config.port;
+// 기본 포트는 application.dev.json(3100). 필요 시 PORT 환경변수로 덮어쓴다.
+const port = Number(process.env.PORT) || config.port;
 
 // CORS 허용 origin 화이트리스트: 기본값 + 환경변수 CORS_ORIGINS(콤마 구분) 병합
 const whitelist: string[] = [
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
   'http://localhost:5173',
   'http://121.173.23.70:5173',
   'http://localhost:3000',
+  'http://localhost:3100',
   ...(process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
         .map((o) => o.trim())
