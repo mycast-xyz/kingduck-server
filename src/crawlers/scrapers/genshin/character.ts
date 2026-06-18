@@ -109,6 +109,17 @@ export class GenshinCharacterScraper extends ScraperBase {
         );
         const localCardUrl = await this.dlIcon(cardIcon, `card_${originalId}`);
 
+        // 속성 아이콘(필터용) — Ambr 자산 UI_Buff_Element_{Fire|Water|Ice|Electric|Wind|Rock|Grass}.png.
+        // DB Element(DamageType) 이름이 이 내부명과 동일 → 그대로 사용. 속성별 1개 파일.
+        // DataSyncService가 Element.iconUrl에 적재(빈 경우만 — 수동값 보존).
+        const localElementIconUrl = element
+          ? await this.dlIcon(
+              `UI_Buff_Element_${element}`,
+              `element_${element}`,
+              'element',
+            )
+          : null;
+
         // 상세 raw(콘텐츠 상세용 — 추후 genshin 뷰모델에서 가공)
         const description =
           (d.fetter && typeof d.fetter === 'object' && d.fetter.detail) || '';
@@ -125,6 +136,7 @@ export class GenshinCharacterScraper extends ScraperBase {
           originalId,
           rarity,
           element,
+          elementIconUrl: localElementIconUrl, // DataSyncService가 Element(DamageType).iconUrl로 적재
           path: weaponKey,
           weaponType: weaponKey,
           region,
