@@ -56,7 +56,8 @@ export class YoutubeShortsScraper extends ScraperBase {
       }
       logger.info(`Uploads playlist: ${uploadsPlaylistId}`);
 
-      // 2. 업로드 영상 ID 수집(최대 10페이지 = 500개)
+      // 2. 업로드 영상 ID 전체 수집. @nikkekr는 958개+라 과거 영상(【】 옛 제목 형식 등)까지
+      //    닿으려면 충분히 페이지를 넘겨야 한다. 안전 상한 40페이지(=2000개)까지 끝까지 수집.
       const videoIds: string[] = [];
       let nextPageToken: string | undefined = undefined;
       let pageCount = 0;
@@ -72,7 +73,7 @@ export class YoutubeShortsScraper extends ScraperBase {
           if (vid) videoIds.push(vid);
         }
         nextPageToken = response.data.nextPageToken;
-        if (++pageCount >= 10) break;
+        if (++pageCount >= 40) break;
       } while (nextPageToken);
       logger.info(`Collected ${videoIds.length} video IDs`);
 
