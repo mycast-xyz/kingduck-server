@@ -112,7 +112,7 @@ export class AdminController {
       }
       const elements = await prisma.element.findMany({
         where: { gameId: game.id },
-        select: { id: true, name: true, displayName: true, type: true, iconUrl: true },
+        select: { id: true, name: true, displayName: true, color: true, type: true, iconUrl: true },
         orderBy: [{ type: 'asc' }, { id: 'asc' }],
       });
       sendOk(res, { slug, elements });
@@ -122,7 +122,7 @@ export class AdminController {
     }
   }
 
-  // 속성/특성(Element)의 한글 표시명 수정 — 어드민이 직접 영문 키 → 한글 매핑.
+  // 속성/특성(Element) 수정 — 한글 표시명/원색(틴트). 보낸 필드만 갱신(빈 문자열은 해제=null).
   async updateElement(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
@@ -130,18 +130,25 @@ export class AdminController {
         res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
         return;
       }
-      const raw = (req.body?.displayName ?? '').toString().trim();
-      const displayName = raw.length > 0 ? raw : null; // 빈 값은 null(미설정)로
+      const data: { displayName?: string | null; color?: string | null } = {};
+      if (req.body?.displayName !== undefined) {
+        const v = String(req.body.displayName).trim();
+        data.displayName = v.length > 0 ? v : null;
+      }
+      if (req.body?.color !== undefined) {
+        const v = String(req.body.color).trim();
+        data.color = v.length > 0 ? v : null; // 예: "#e0533d"
+      }
       const updated = await prisma.element.update({
         where: { id },
-        data: { displayName },
-        select: { id: true, name: true, displayName: true, type: true, iconUrl: true },
+        data,
+        select: { id: true, name: true, displayName: true, color: true, type: true, iconUrl: true },
       });
-      logger.info(`Element displayName updated: #${id} → ${displayName ?? '(null)'}`);
+      logger.info(`Element updated: #${id} ${JSON.stringify(data)}`);
       sendOk(res, updated);
     } catch (error) {
       logger.error('updateElement Error:', error);
-      res.status(500).json({ resultCode: 500, resultMsg: '한글명 저장에 실패했습니다.' });
+      res.status(500).json({ resultCode: 500, resultMsg: '속성 저장에 실패했습니다.' });
     }
   }
 

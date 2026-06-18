@@ -102,6 +102,7 @@ model Element {
   gameId    Int      @map("game_id")
   name        String // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt" (소스 영문 키)
   displayName String?  @map("display_name") // 한글 표시명(어드민 편집). 필터/상세가 우선 사용.
+  color       String? // 원색(hex). 단색/흰색 아이콘을 이 색으로 틴트(CSS mask)할 때 사용.
   type        String // "DamageType" 또는 "Path"
   iconUrl     String?  @map("icon_url")
   createdAt DateTime @default(now()) @map("created_at")
