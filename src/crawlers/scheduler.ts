@@ -26,6 +26,7 @@ import { EndfieldItemScraper } from './scrapers/endfield/ItemScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { NikkeCharacterScraper } from './scrapers/nikke/CharacterScraper';
+import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -340,6 +341,16 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new NikkeCharacterScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncCharacters('nikke', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'nikke',
+    type: 'video',
+    run: async (s) => {
+      const scraper = new NikkeYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('nikke', data);
       return data.length;
     },
   },
