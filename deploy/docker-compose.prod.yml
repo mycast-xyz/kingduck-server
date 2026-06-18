@@ -1,0 +1,63 @@
+# KingDuck 홈서버 프로덕션 구성: PostgreSQL + 백엔드(app) + Caddy(프론트 정적 + 리버스 프록시 + 자동 HTTPS).
+#
+# 전제: kingduck 와 kingduck-server 가 같은 부모 디렉터리에 나란히 클론되어 있고,
+#       프론트는 미리 `pnpm run build`(adapter-static → kingduck/build) 되어 있다.
+# 실행: cd kingduck-server && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production up -d --build
+#
+# 주의(크롤러): app 이미지에 Chromium 의존성이 없으면 Puppeteer 기반 크롤러(원신/명조 등)는 실패한다.
+#   니케는 fetch 기반이라 무관. Puppeteer 게임을 돌리려면 Dockerfile에 Chromium deps 추가 필요(README 참고).
+
+services:
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-game}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-game}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 외부 미노출 — 같은 compose 네트워크의 app/백업만 접근.
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-game}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../static/image:/usr/src/app/static/image # 크롤링 이미지 자산 영속
+    # 외부 미노출 — Caddy를 통해서만 접근(prod 포트 3000).
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../kingduck/build:/srv/web:ro # 프론트 빌드 산출물(adapter-static)
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
