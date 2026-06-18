@@ -70,21 +70,16 @@ export class EndfieldCharacterScraper extends ScraperBase {
         }
 
         if (typeof obj === 'object') {
-          // Check for { id, text } pattern
-          // Logic: if obj has 'id' and 'text', and 'id' is in map, update 'text'.
-          if ('id' in obj && 'text' in obj && typeof obj.id === 'string') {
-            if (i18nMap[obj.id]) {
-              obj.text = i18nMap[obj.id];
-              // We modify in place or return new object.
-              // To be safe against side effects if shared refs exist (unlikely here), copy.
-              return { ...obj, text: i18nMap[obj.id] };
-            }
-          }
-
-          // Recursively process children
+          // 자식부터 재귀 처리.
           const newObj: any = {};
           for (const key in obj) {
             newObj[key] = resolveIds(obj[key]);
+          }
+          // i18n 참조 객체 `{ id: "<key>" }`(또는 `{ id, text }`)를 해석한다.
+          // id가 텍스트맵에 있을 때만 text를 채우므로, 일반 식별자 id
+          // (예: profileRecord의 "chr_0023_antal_1")는 맵에 없어 그대로 둔다.
+          if (typeof newObj.id === 'string' && i18nMap[newObj.id]) {
+            newObj.text = i18nMap[newObj.id];
           }
           return newObj;
         }
