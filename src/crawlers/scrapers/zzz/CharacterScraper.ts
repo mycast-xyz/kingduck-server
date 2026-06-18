@@ -45,17 +45,44 @@ export class ZzzCharacterScraper extends ScraperBase {
   }
 
   /**
+   * `.tag` 내부 img에서 가장 선명한 아이콘 URL을 고른다.
+   * zzz.gg는 Nuxt _ipx 변환(`/_ipx/q_70&s_34x34/images/IconFrost.png 1x, …68x68 2x`)을
+   * srcset으로 내려준다. _ipx는 **페이지가 실제 요청한 변환 문자열만** 200을 주므로(커스텀 크기 404),
+   * 페이지에 박힌 src/srcset URL을 그대로 재사용한다. 2x(68x68)를 우선.
+   */
+  private pickTagIcon(srcset?: string, src?: string): string {
+    if (srcset) {
+      const entries = srcset
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const two = entries.find((e) => /\s2x$/.test(e));
+      const chosen = (two || entries[entries.length - 1] || '').split(/\s+/)[0];
+      if (chosen) return chosen;
+    }
+    return src || '';
+  }
+
+  /**
    * 상세 페이지에서 속성/공격타입/특성/소속 + 아이콘번호 + 등급을 추출.
    * `.tag`는 **순서 고정** [속성, 공격타입, 특성, 소속]이라 위치로 매핑(텍스트 변형에 견고).
    * 속성은 "불 속성"처럼 접미사가 붙기도 해 ` 속성`을 떼어 정규화.
+   * 각 태그 img의 아이콘 URL도 같이 뽑아 속성/특성 필터 아이콘으로 쓴다(위치 0=속성, 2=특성).
    */
   private parseDetail($: cheerio.CheerioAPI) {
-    const tags: string[] = [];
+    const tagEls: Array<{ name: string; icon: string }> = [];
     $('.tag').each((_, el) => {
-      const t = $(el).text().replace(/\s+/g, ' ').trim();
-      if (t) tags.push(t);
+      const tag = $(el);
+      const name = tag.text().replace(/\s+/g, ' ').trim();
+      if (!name) return;
+      const img = tag.find('img').first();
+      const icon = this.pickTagIcon(img.attr('srcset'), img.attr('src'));
+      tagEls.push({ name, icon });
     });
+    const tags = tagEls.map((t) => t.name);
     const element = (tags[0] || '').replace(/\s*속성$/, '').trim();
+    const elementIcon = tagEls[0]?.icon || '';
+    const specialtyIcon = tagEls[2]?.icon || '';
     const iconNo =
       (
         $('img[srcset*="IconRole"]').first().attr('srcset') ||
@@ -70,12 +97,41 @@ export class ZzzCharacterScraper extends ScraperBase {
         .match(/IconRole([SA])Big/) || [])[1] || '';
     return {
       element,
+      elementIcon,
       attackType: tags[1] || '',
       specialty: tags[2] || '',
+      specialtyIcon,
       faction: tags[3] || '',
       iconNo,
       rarity,
     };
+  }
+
+  /**
+   * `.tag` img의 _ipx URL을 받아 webp로 저장하고 상대경로를 반환.
+   * 파일명은 자산 베이스명(예 IconFrost)로 — ASCII 안전 + 속성당 1파일(중복 스킵).
+   * DataSyncService가 이 값을 Element.iconUrl에 적재한다(빈 경우만 — 수동값 보존).
+   */
+  private async dlFilterIcon(
+    iconPath: string,
+    label: string,
+    namePrefix: string,
+  ): Promise<string | null> {
+    if (!iconPath || !label) return null;
+    const url = iconPath.startsWith('http') ? iconPath : `${BASE}${iconPath}`;
+    const asset = (iconPath.match(/images\/(.+?)\.png/) || [])[1];
+    if (!asset) {
+      logger.warn(`ZZZ: filter icon asset 미파싱 (${label}, src=${iconPath})`);
+      return null;
+    }
+    const saved = await ImageDownloader.downloadAndSave(
+      url,
+      'zzz',
+      'element',
+      `${namePrefix}_${asset}`,
+    );
+    if (!saved) logger.warn(`ZZZ: filter icon 다운로드 실패 (${label}, ${url})`);
+    return saved;
   }
 
   /** 스킬: `.ability` 카드 = .header(아이콘+h3.name) + p.description. */
@@ -136,6 +192,11 @@ export class ZzzCharacterScraper extends ScraperBase {
             (await ImageDownloader.downloadAndSave(url, 'zzz', 'character', `icon_${d.iconNo}`)) || '';
         }
 
+        // 속성(DamageType)/특성(Path) 필터 아이콘 — `.tag` img에서 추출해 저장.
+        // 속성별 1파일. DataSyncService가 Element.iconUrl에 적재(빈 경우만).
+        const elementIconUrl = await this.dlFilterIcon(d.elementIcon, d.element, 'element');
+        const pathIconUrl = await this.dlFilterIcon(d.specialtyIcon, d.specialty, 'path');
+
         results.push({
           name,
           sourceUrl: `${BASE}/ko/characters/${encodeURIComponent(it.slug)}`,
@@ -146,7 +207,9 @@ export class ZzzCharacterScraper extends ScraperBase {
           metadata: {
             originalId: d.iconNo ? `IconRole${d.iconNo}` : it.name,
             element: d.element, // 속성 → DamageType
+            elementIconUrl, // DataSyncService가 Element(DamageType).iconUrl로 적재
             path: d.specialty, // 특성 → Path
+            pathIconUrl, // Element(Path).iconUrl로 적재
             attackType: d.attackType,
             faction: d.faction,
             rarity: d.rarity,
