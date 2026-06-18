@@ -80,8 +80,9 @@ export class YoutubeShortsScraper extends ScraperBase {
       const videoDetails: any[] = [];
       for (let i = 0; i < videoIds.length; i += 50) {
         const detailsResponse: any = await youtube.videos.list({
-          part: ['contentDetails', 'snippet'],
+          part: ['contentDetails', 'snippet', 'player'],
           id: videoIds.slice(i, i + 50),
+          maxWidth: 320, // player.embedWidth/embedHeight 계산용 → 종횡비 판별
         });
         videoDetails.push(...(detailsResponse.data.items || []));
       }
@@ -91,6 +92,11 @@ export class YoutubeShortsScraper extends ScraperBase {
       for (const video of videoDetails) {
         const durationSeconds = this.parseDuration(video.contentDetails?.duration || '');
         if (durationSeconds > 60) continue;
+
+        // 세로(9:16) 쇼츠만. 16:9 가로 영상(PV 등 ≤60초로 섞여 들어옴)은 제외.
+        const ew = Number(video.player?.embedWidth) || 0;
+        const eh = Number(video.player?.embedHeight) || 0;
+        if (ew > 0 && eh > 0 && ew >= eh) continue;
 
         const videoId = video.id;
         const title: string = video.snippet?.title || '';
