@@ -112,13 +112,36 @@ export class AdminController {
       }
       const elements = await prisma.element.findMany({
         where: { gameId: game.id },
-        select: { id: true, name: true, type: true, iconUrl: true },
+        select: { id: true, name: true, displayName: true, type: true, iconUrl: true },
         orderBy: [{ type: 'asc' }, { id: 'asc' }],
       });
       sendOk(res, { slug, elements });
     } catch (error) {
       logger.error('getElementList Error:', error);
       res.status(500).json({ resultCode: 500, resultMsg: '속성 목록 조회에 실패했습니다.' });
+    }
+  }
+
+  // 속성/특성(Element)의 한글 표시명 수정 — 어드민이 직접 영문 키 → 한글 매핑.
+  async updateElement(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+      const raw = (req.body?.displayName ?? '').toString().trim();
+      const displayName = raw.length > 0 ? raw : null; // 빈 값은 null(미설정)로
+      const updated = await prisma.element.update({
+        where: { id },
+        data: { displayName },
+        select: { id: true, name: true, displayName: true, type: true, iconUrl: true },
+      });
+      logger.info(`Element displayName updated: #${id} → ${displayName ?? '(null)'}`);
+      sendOk(res, updated);
+    } catch (error) {
+      logger.error('updateElement Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '한글명 저장에 실패했습니다.' });
     }
   }
 

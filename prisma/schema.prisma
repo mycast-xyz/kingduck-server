@@ -100,9 +100,10 @@ model CrawlerLog {
 model Element {
   id        Int      @id @default(autoincrement())
   gameId    Int      @map("game_id")
-  name      String // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt"
-  type      String // "DamageType" 또는 "Path"
-  iconUrl   String?  @map("icon_url")
+  name        String // 예: "Pyro", "Fire", "Mineral", "Destruction", "Hunt" (소스 영문 키)
+  displayName String?  @map("display_name") // 한글 표시명(어드민 편집). 필터/상세가 우선 사용.
+  type        String // "DamageType" 또는 "Path"
+  iconUrl     String?  @map("icon_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
