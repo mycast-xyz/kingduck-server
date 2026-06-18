@@ -100,6 +100,72 @@ export class AdminController {
       res.status(500).json({ resultCode: 500, resultMsg: '아이콘 업로드에 실패했습니다.' });
     }
   }
+
+  // 게임별 속성/특성(Element) 목록 — 어드민 아이콘 관리 화면용.
+  async getElementList(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.query.slug || '');
+      const game = await prisma.game.findUnique({ where: { slug } });
+      if (!game) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+      const elements = await prisma.element.findMany({
+        where: { gameId: game.id },
+        select: { id: true, name: true, type: true, iconUrl: true },
+        orderBy: [{ type: 'asc' }, { id: 'asc' }],
+      });
+      sendOk(res, { slug, elements });
+    } catch (error) {
+      logger.error('getElementList Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '속성 목록 조회에 실패했습니다.' });
+    }
+  }
+
+  // 속성/특성(Element) 아이콘 업로드/교체 — uploadGameIcon과 동형(sharp→webp→static→iconUrl).
+  async uploadElementIcon(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+
+      const element = await prisma.element.findUnique({
+        where: { id },
+        include: { game: true },
+      });
+      if (!element) {
+        res.status(404).json({ resultCode: 404, resultMsg: '속성을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const slug = element.game.slug;
+      // static/image/{slug}/element/{id}.webp (express '/assets' → 'static'). id로 파일명 → 이름 특수문자 회피.
+      const dir = path.join(process.cwd(), 'static', 'image', slug, 'element');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `${id}.webp`));
+
+      const iconUrl = `assets/image/${slug}/element/${id}.webp?v=${Date.now()}`;
+      const updated = await prisma.element.update({ where: { id }, data: { iconUrl } });
+      logger.info(
+        `Element icon updated: ${slug}/${element.type}/${element.name} (#${id}) → ${iconUrl}`,
+      );
+      sendOk(res, { id, iconUrl: updated.iconUrl });
+    } catch (error) {
+      logger.error('uploadElementIcon Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '아이콘 업로드에 실패했습니다.' });
+    }
+  }
   /**
    * 캐릭터 목록 조회 (페이지네이션, 검색)
    * GET /api/v0/admin/character/list

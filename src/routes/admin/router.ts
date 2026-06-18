@@ -55,6 +55,14 @@ router.post(
   AdminController.uploadGameIcon,
 );
 
+// 속성/특성(Element) 아이콘 관리 — 필터 아이콘이 DB(Element.iconUrl) 기반이라 여기서 채운다.
+router.get('/element/list', AdminController.getElementList);
+router.post(
+  '/element/:id/icon',
+  iconUpload.single('file'),
+  AdminController.uploadElementIcon,
+);
+
 /**
  * @swagger
  * /api/v0/admin/character/list:
