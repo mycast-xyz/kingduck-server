@@ -1,6 +1,7 @@
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
+import * as cheerio from 'cheerio';
 
 /**
  * 니케(승리의 여신: NIKKE) 캐릭터 스크래퍼 — NIKKE International Fandom 위키 소스.
@@ -78,6 +79,79 @@ export class NikkeCharacterScraper extends ScraperBase {
   private field(wt: string, key: string): string {
     const m = wt.match(new RegExp(`\\|\\s*${key}\\s*=\\s*([^\\n]*)`, 'i'));
     return m ? this.cleanWiki(m[1]) : '';
+  }
+
+  // ── 스킬은 한국어 소스(Inven nikke DB)에서 가져온다. fandom은 영문이라 부적합. ──
+  private invenMap: Record<string, string> | null = null;
+
+  // 이름 정규화(매칭용): Inven은 이름 끝에 카운트 숫자가 붙는다("스노우 화이트 2") → 제거.
+  // 이후 공백·「」·: 제거, 소문자. (N102/2B 등 숫자포함명은 '공백+숫자'가 아니라 영향 없음)
+  private normName(s: string): string {
+    return (s || '')
+      .replace(/\s+\d+$/, '')
+      .replace(/[「」:\s]/g, '')
+      .toLowerCase();
+  }
+
+  // Inven 니케 DB 목록 → 한글이름 → charId 매핑(1회 캐시).
+  private async loadInvenMap(): Promise<Record<string, string>> {
+    if (this.invenMap) return this.invenMap;
+    const map: Record<string, string> = {};
+    try {
+      const res = await fetch('https://nikke.inven.co.kr/db/chara/', {
+        headers: { 'User-Agent': UA },
+      });
+      const $ = cheerio.load(await res.text());
+      $('a[href*="/db/chara/"]').each((_, el) => {
+        const id = ($(el).attr('href') || '').match(/\/db\/chara\/(\d+)/)?.[1];
+        const text = $(el).text().replace(/\s+/g, ' ').trim();
+        if (!id || !text) return;
+        // 캐릭터명 anchor만(기업/스쿼드/코드 설명 anchor 제외).
+        if (/기업|스쿼드|코드|클래스|무기/.test(text)) return;
+        const key = this.normName(text);
+        if (key && !map[key]) map[key] = id;
+      });
+    } catch (e) {
+      logger.warn(`Inven 목록 로드 실패: ${(e as Error).message}`);
+    }
+    this.invenMap = map;
+    logger.info(`Inven skill map: ${Object.keys(map).length} entries`);
+    return map;
+  }
+
+  /**
+   * Inven 상세에서 스킬 "설명"만 추출(한국어). 이름/타입은 위치 라벨 부여.
+   * .skill_desc 순서: [기본 무기, 스킬 1, 스킬 2, 버스트 스킬].
+   */
+  private async fetchInvenSkills(
+    name: string,
+  ): Promise<Array<{ name: string; type: string; description: string }>> {
+    const map = await this.loadInvenMap();
+    const id = map[this.normName(name)];
+    if (!id) return [];
+    try {
+      const res = await fetch(`https://nikke.inven.co.kr/db/chara/${id}`, {
+        headers: { 'User-Agent': UA },
+      });
+      const $ = cheerio.load(await res.text());
+      const labels = ['기본 무기', '스킬 1', '스킬 2', '버스트 스킬'];
+      const skills: Array<{ name: string; type: string; description: string }> = [];
+      $('.skill_desc').each((i, el) => {
+        // 스탯/효과 div 사이 여백 정리: 공백 압축 + 연속 줄바꿈(공백 포함)을 단일 줄바꿈으로.
+        const description = $(el)
+          .text()
+          .replace(/[ \t]+/g, ' ')
+          .replace(/(\s*\n\s*)+/g, '\n')
+          .trim();
+        if (!description) return;
+        const label = labels[i] || `스킬 ${i + 1}`;
+        skills.push({ name: label, type: label, description });
+      });
+      return skills;
+    } catch (e) {
+      logger.warn(`Inven 스킬 실패 ${name}(${id}): ${(e as Error).message}`);
+      return [];
+    }
   }
 
   /** File: 제목들의 실제 이미지 URL을 한 번에 해석. */
@@ -169,6 +243,7 @@ export class NikkeCharacterScraper extends ScraperBase {
             },
             releaseDate: this.field(wt, 'releaseDate'),
             cardImageUrl: localCard,
+            skills: await this.fetchInvenSkills(nameKr || nameEn), // 스킬 설명(한국어, Inven)
           },
         });
       } catch (err) {
