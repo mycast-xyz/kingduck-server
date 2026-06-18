@@ -113,6 +113,30 @@ export class DataSyncService {
         });
 
         if (existing) {
+          // 빌드/추천 크롤(genshin/build, starrail/build 등)이 넣은 enrichment 키는
+          // character 재크롤(이 키를 안 만듦)이 metadata를 통째 교체하며 덮어버리지 않도록 보존한다.
+          // (서버에서 character가 build보다 나중에 돌면 추천이 사라지던 버그.)
+          const existingMeta = (existing.metadata as Record<string, any>) || {};
+          const newMeta = (item.metadata as Record<string, any>) || {};
+          const PRESERVE_KEYS = [
+            'recommendedWeapons',
+            'recommendedArtifacts',
+            'teams',
+            'recommendedSource',
+            'lightcones',
+            'relics',
+            'recommendedLightCones',
+            'recommendedRelics',
+            'recommendedEchoes',
+            'echoSets',
+          ];
+          const merged: Record<string, any> = { ...newMeta };
+          for (const k of PRESERVE_KEYS) {
+            if (existingMeta[k] !== undefined && newMeta[k] === undefined) {
+              merged[k] = existingMeta[k];
+            }
+          }
+
           // Update existing character
           await prisma.character.update({
             where: { id: existing.id },
@@ -128,7 +152,7 @@ export class DataSyncService {
               imageUrl: item.imageUrl,
               elementId,
               pathId,
-              metadata: item.metadata,
+              metadata: merged,
               updatedAt: new Date(),
             },
           });
