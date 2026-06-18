@@ -30,6 +30,7 @@ import { BlablalinkCharacterScraper } from './scrapers/nikke/BlablalinkCharacter
 import { BlablalinkIconScraper } from './scrapers/nikke/BlablalinkIconScraper';
 import { BlablalinkDetailScraper } from './scrapers/nikke/BlablalinkDetailScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
+import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
@@ -389,6 +390,14 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('nikke', data);
       return data.length;
+    },
+  },
+  {
+    game: 'nikke',
+    type: 'event',
+    run: async () => {
+      const scraper = new BlablalinkEventScraper();
+      return await scraper.scrape();
     },
   },
 
