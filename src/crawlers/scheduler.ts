@@ -26,6 +26,7 @@ import { EndfieldItemScraper } from './scrapers/endfield/ItemScraper';
 import { EndfieldYoutubeShortsScraper } from './scrapers/endfield/YoutubeShortsScraper';
 import { EventScraper as EndfieldEventScraper } from './scrapers/endfield/EventScraper';
 import { BlablalinkCharacterScraper } from './scrapers/nikke/BlablalinkCharacterScraper';
+import { BlablalinkIconScraper } from './scrapers/nikke/BlablalinkIconScraper';
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { DataSyncService } from './services/DataSyncService';
@@ -345,6 +346,16 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       await s.purgeCharacters('nikke'); // 기존 fandom 데이터 제거(videos+chars), Element 보존
       await s.syncCharacters('nikke', data);
       return data.length;
+    },
+  },
+  {
+    game: 'nikke',
+    type: 'icon',
+    // 속성 아이콘(코드/무기/클래스/제조사/버스트) 다운로드 + Element.iconUrl / game.attrIcons 연결.
+    // blablalink 공개 정적 자산을 결정론적 URL로 받는다(렌더 불필요). 캐릭터 데이터는 건드리지 않음.
+    run: async (s) => {
+      const scraper = new BlablalinkIconScraper();
+      return await scraper.syncIcons();
     },
   },
   {

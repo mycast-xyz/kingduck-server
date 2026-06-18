@@ -14,6 +14,7 @@ model Game {
   iconUrl     String?  @map("icon_url")
   rarityColors Json?   @map("rarity_colors") // 등급별 카드 색상(어드민 편집). 코드 기본값 위에 머지.
   rarityDisplay Json?  @map("rarity_display") // 등급 표시 방식 { mode:'stars'|'image', images:{tier:url} }
+  attrIcons    Json?   @map("attr_icons") // Element 행이 아닌 속성(클래스/제조사/버스트 등)의 아이콘 경로 맵 { kind: { value: relPath } }. getGameBySlug/character list가 game으로 반환 → 프론트가 metadata 값으로 조회.
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
