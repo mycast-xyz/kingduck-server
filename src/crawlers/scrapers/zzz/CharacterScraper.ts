@@ -78,6 +78,38 @@ export class ZzzCharacterScraper extends ScraperBase {
     };
   }
 
+  /** 스킬: `.ability` 카드 = .header(아이콘+h3.name) + p.description. */
+  private parseSkills($: cheerio.CheerioAPI) {
+    const skills: Array<{ name: string; type: string; description: string }> = [];
+    $('.ability').each((_, el) => {
+      const card = $(el);
+      const full = card.find('.header h3.name').first().text().replace(/\s+/g, ' ').trim();
+      const desc = card.find('p.description').first().text().replace(/\s+/g, ' ').trim();
+      if (!full) return;
+      // "일반 공격: 냥냥 할퀴기" → type="일반 공격", name="냥냥 할퀴기"
+      const m = full.match(/^([^:]+):\s*(.+)$/);
+      const type = m ? m[1].trim() : '';
+      const name = m ? m[2].trim() : full;
+      skills.push({ name, type, description: desc });
+    });
+    return skills;
+  }
+
+  /** 재능(심상 영식): h3(클래스 없음) + 다음 .description div. */
+  private parseTalents($: cheerio.CheerioAPI) {
+    const talents: Array<{ name: string; description: string }> = [];
+    $('h3').each((_, el) => {
+      const h = $(el);
+      if (h.attr('class')) return; // 스킬은 h3.name → 제외
+      const next = h.next();
+      if (!next.hasClass('description')) return;
+      const name = h.text().replace(/\s+/g, ' ').trim();
+      const description = next.text().replace(/\s+/g, ' ').trim();
+      if (name && description) talents.push({ name, description });
+    });
+    return talents;
+  }
+
   async scrape(limit?: number): Promise<ScrapedData[]> {
     logger.info('Starting ZZZ character scraping (zzz.gg/ko)...');
     const $list = cheerio.load(await this.getHtml(this.LIST_URL));
@@ -93,6 +125,8 @@ export class ZzzCharacterScraper extends ScraperBase {
         const $ = cheerio.load(await this.getHtml(`${BASE}/ko/characters/${encodeURIComponent(it.slug)}`));
         const name = $('h1').first().text().trim() || it.name;
         const d = this.parseDetail($);
+        const skills = this.parseSkills($);
+        const talents = this.parseTalents($);
 
         // 이미지: Nuxt _ipx 엔드포인트(원본 /images/IconRole{NN}.png는 일부 404 → _ipx는 전부 200).
         let localIcon = '';
@@ -117,9 +151,13 @@ export class ZzzCharacterScraper extends ScraperBase {
             faction: d.faction,
             rarity: d.rarity,
             cardImageUrl: localIcon,
+            skills, // 스킬(SkillTreeView)
+            talents, // 심상 영식(RankListView)
           },
         });
-        logger.info(`ZZZ: ${name} (${d.element}/${d.specialty}/${d.rarity}-rank, icon ${d.iconNo})`);
+        logger.info(
+          `ZZZ: ${name} (${d.element}/${d.specialty}/${d.rarity}-rank, ${skills.length} skills, ${talents.length} talents)`
+        );
       } catch (err) {
         errors++;
         logger.error(`Failed to scrape ZZZ agent ${it.name}:`, err);
