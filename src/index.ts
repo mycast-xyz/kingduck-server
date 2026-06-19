@@ -162,7 +162,7 @@ app.get('/sitemap.xml', async (_req, res) => {
       itemGames.map((i) => i.game?.slug).filter(Boolean) as string[],
     );
 
-    const urls: string[] = ['/', '/privacy', '/terms'];
+    const urls: string[] = ['/', '/about', '/contact', '/privacy', '/terms'];
     for (const g of games) {
       urls.push(
         `/list/${g.slug}`,
