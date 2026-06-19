@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { Browser } from '../../core/Browser';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 니케 캐릭터 스크래퍼 — blablalink(SHIFT UP 공식 한국어) 단일 소스.
@@ -71,6 +72,8 @@ export class BlablalinkCharacterScraper extends ScraperBase {
 
     const results: ScrapedData[] = [];
     for (let i = 0; i < records.length; i++) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(i, records.length, records[i]?.name_localkey?.name || '');
       const r = records[i];
       const name = r?.name_localkey?.name;
       const blId = r?.id;

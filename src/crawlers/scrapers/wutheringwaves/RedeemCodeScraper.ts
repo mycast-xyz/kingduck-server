@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import puppeteer from 'puppeteer';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 const WW_GAME_SLUG = 'wutheringwaves';
 const SEARCH_URL =
@@ -230,7 +231,10 @@ export class RedeemCodeScraper {
       logger.info(`[WWRedeemCodeScraper] Updated existing group: ${group.id}`);
     }
 
+    let processed = 0;
     for (const codeStr of data.codes) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed++, data.codes.length, codeStr);
       try {
         await this.prisma.redeemCode.upsert({
           where: { code: codeStr },

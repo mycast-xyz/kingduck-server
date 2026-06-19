@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 니케 공식 한국 채널(@nikkekr)에서 캐릭터 Shorts를 수집한다.
@@ -90,7 +91,11 @@ export class YoutubeShortsScraper extends ScraperBase {
       logger.info(`Fetched details for ${videoDetails.length} videos`);
 
       // 4. Shorts(≤60s) + 제목에서 캐릭터명 매칭
+      let processed = 0;
       for (const video of videoDetails) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, videoDetails.length, video.snippet?.title || '');
+        processed++;
         const durationSeconds = this.parseDuration(video.contentDetails?.duration || '');
         if (durationSeconds > 60) continue;
 

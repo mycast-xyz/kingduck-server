@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class GenshinYoutubeShortsScraper extends ScraperBase {
   private readonly CHANNEL_HANDLE = '@GenshinImpact_kr';
@@ -67,6 +68,8 @@ export class GenshinYoutubeShortsScraper extends ScraperBase {
       let pageCount = 0;
       do {
         pageCount++;
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(pageCount, 10, `Page ${pageCount}`); // 페이지 상한 10
         const response: any = await youtube.playlistItems.list({
           part: ['snippet'],
           playlistId: uploadsPlaylistId,

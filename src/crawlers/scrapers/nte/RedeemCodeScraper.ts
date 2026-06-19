@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 이환(NTE) 리딤코드(쿠폰) 스크래퍼 — everness.info GraphQL `promocodes`.
@@ -88,7 +89,11 @@ export class NteRedeemCodeScraper {
     }
 
     const codes: string[] = [];
+    let processed = 0;
     for (const p of promocodes) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, promocodes.length, p.code);
+      processed++;
       const code = (p.code || '').toString().trim();
       if (!code) continue;
       const reward =

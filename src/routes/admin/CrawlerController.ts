@@ -317,14 +317,15 @@ export class CrawlerController {
         logger.warn(`Purge before re-crawl: ${gameSlug}/${crawlerType}`);
       }
 
-      // 진행 상황 레지스트리 등록(스크래퍼가 같은 키로 report/shouldStop).
+      // 진행 상황 레지스트리 등록. 스크래퍼는 runWith 컨텍스트로 자동 귀속(키 불필요).
       const progressKey = `${gameSlug}:${crawlerType}`;
       crawlProgress.begin(progressKey);
 
       // 백그라운드 실행. 이 태스크의 데이터 공백 요약만 기록되도록 리셋.
+      // runWith로 감싸 진행/중단 컨텍스트(key)를 스크래퍼까지 전파(동시 실행도 안전).
       syncService.lastSyncGaps = null;
-      task
-        .run(syncService)
+      crawlProgress
+        .runWith(progressKey, () => task.run(syncService))
         .then(async (itemsFound) => {
           logger.info(`Manual task [${gameSlug}] ${crawlerType} completed.`);
           // 완료 로그 업데이트(데이터 공백 요약을 metadata에 기록 → 로그 상세 모달 노출).

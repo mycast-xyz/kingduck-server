@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class YoutubeShortsScraper extends ScraperBase {
   private readonly CHANNEL_HANDLE = '@WW_KR_Official';
@@ -107,7 +108,11 @@ export class YoutubeShortsScraper extends ScraperBase {
         '공명자 모먼트',
       ];
 
+      let processed = 0;
       for (const video of videoDetails) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, videoDetails.length, video.snippet?.title || '');
+        processed++;
         const duration = video.contentDetails?.duration;
         const durationSeconds = this.parseDuration(duration);
 

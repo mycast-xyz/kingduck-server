@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 import { EventType, CrawlerStatus, EventStatus } from '@prisma/client';
 
 export class EventScraper extends ScraperBase {
@@ -58,7 +59,10 @@ export class EventScraper extends ScraperBase {
       const feeds = listResponse.data.content.feeds;
       logger.info(`Fetched ${feeds.length} posts from Naver.`);
 
+      let processed = 0;
       for (const item of feeds) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed++, feeds.length, item.feed?.title || '');
         const feed = item.feed;
         const title = feed.title;
 

@@ -4,6 +4,7 @@ import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { BASE_API_URL, getImageUrl } from './utils';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 import { WutheringWavesDownloader } from '../../utils/WutheringWavesDownloader';
 
@@ -63,7 +64,11 @@ export class WutheringWavesWeaponScraper extends ScraperBase {
       const list = data.weapons || [];
       const results: ScrapedData[] = [];
 
+      let processed = 0;
       for (const item of list) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, list.length, item.Name);
+        processed++;
         const detailUrl = `${BASE_API_URL}/weapon/${item.Id}`;
         let rawDetailData = item;
         try {

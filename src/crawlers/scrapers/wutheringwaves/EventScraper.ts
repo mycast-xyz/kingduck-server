@@ -4,6 +4,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
 import { EventType } from '@prisma/client';
+import { crawlProgress } from '../../crawlProgress';
 
 interface ParsedEvent {
   title: string;
@@ -80,7 +81,11 @@ export class EventScraper extends ScraperBase {
 
       logger.info(`Loaded ${events.length} parsed events from file.`);
 
+      let processed = 0;
       for (const event of events) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, events.length, event.title);
+        processed++;
         // Process each event and save to database
         await this.processEvent(event, game.id);
 

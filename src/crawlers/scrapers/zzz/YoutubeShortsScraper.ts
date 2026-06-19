@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 젠레스 존 제로(ZZZ) 공식 한국 채널(@ZZZ_KO)에서 캐릭터 영상을 수집한다.
@@ -65,7 +66,9 @@ export class ZzzYoutubeScraper extends ScraperBase {
       // 2. 업로드 영상 수집(제목+썸네일). 안전 상한 20페이지(=1000개).
       let nextPageToken: string | undefined = undefined;
       let pageCount = 0;
+      let processed = 0;
       do {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
         const response: any = await youtube.playlistItems.list({
           part: ['snippet'],
           playlistId: uploadsPlaylistId,
@@ -73,6 +76,8 @@ export class ZzzYoutubeScraper extends ScraperBase {
           pageToken: nextPageToken,
         });
         for (const item of response.data.items || []) {
+          crawlProgress.report(processed, undefined, item.snippet?.title || '');
+          processed++;
           const videoId = item.snippet?.resourceId?.videoId;
           const title: string = item.snippet?.title || '';
           if (!videoId || !title) continue;

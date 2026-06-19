@@ -7,6 +7,7 @@ import {
   SRS_BASE,
   mapPathToEn,
 } from '../../utils/srsPageConfig';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 광추(LightCone) 스크래퍼 — starrailstation.com 소스.
@@ -44,6 +45,8 @@ export class LightConeScraper extends ScraperBase {
     let processed = 0;
     let detailErrors = 0;
     for (const entry of entries) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, entry.name);
       processed++;
       const pageId = entry.pageId;
       if (!pageId) {

@@ -4,6 +4,7 @@ import { axiosGetWithRetry } from '../../utils/httpRetry';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
 import { fetchPageConfig, SRS_BASE } from '../../utils/srsPageConfig';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 스타레일 추천 빌드 스크래퍼 — genshin.gg/star-rail(커뮤니티 큐레이션) 소스.
@@ -96,6 +97,8 @@ export class StarRailBuildScraper extends ScraperBase {
     const unmappedChars: string[] = [];
 
     for (const slug of slugs) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, slugs.length, slug);
       processed++;
       try {
         const html = await this.fetchGg(slug);

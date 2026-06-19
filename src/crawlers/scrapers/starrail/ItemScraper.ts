@@ -5,6 +5,7 @@ import { prisma } from '../../../utils/prisma';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import fs from 'fs';
 import path from 'path';
+import { crawlProgress } from '../../crawlProgress';
 
 export class StarRailItemScraper extends ScraperBase {
   private readonly API_URL = 'https://api.hakush.in/hsr/data/kr/item_all.json';
@@ -59,7 +60,10 @@ export class StarRailItemScraper extends ScraperBase {
 
       const results: ScrapedData[] = [];
 
+      let processed = 0;
       for (const item of itemsToProcess) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed++, itemsToProcess.length, item.ItemName);
         // Map to ScrapedData
 
         // Fallback for type

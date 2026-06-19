@@ -9,6 +9,7 @@ import {
   mapDamageTypeToEn,
   mapPathToEn,
 } from '../../utils/srsPageConfig';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 캐릭터 스크래퍼 — starrailstation.com 소스.
@@ -56,6 +57,8 @@ export class CharacterScraper extends ScraperBase {
     let processed = 0;
     let detailErrors = 0;
     for (const entry of entries) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, entry.name);
       processed++;
       const pageId = entry.pageId;
       const originalId = String(entry.rankKey ?? '');

@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 젠레스 존 제로(ZZZ) 아이템 스크래퍼 — zzz.gg/ko 소스(캐릭터 스크래퍼와 동일 Nuxt SSR).
@@ -104,7 +105,11 @@ export class ZzzItemScraper extends ScraperBase {
 
     const out: ScrapedData[] = [];
     let errors = 0;
+    let processed = 0;
     for (const e of entries) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, e.name);
+      processed++;
       try {
         const base = this.assetBase(e.icon);
         const originalId = base || e.name;
@@ -211,7 +216,11 @@ export class ZzzItemScraper extends ScraperBase {
 
     const out: ScrapedData[] = [];
     let errors = 0;
+    let processed = 0;
     for (const e of entries) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, e.name);
+      processed++;
       try {
         const detail = await this.fetchDiskDetail(e.slug).catch(() => null);
         const set2 = detail?.['2pc']?.desc ? detail['2pc'] : { desc: '' };

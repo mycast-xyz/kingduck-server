@@ -4,6 +4,7 @@ import { axiosGetWithRetry } from '../../utils/httpRetry';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 원신 추천 빌드 스크래퍼 — genshin.gg(커뮤니티 큐레이션) 소스.
@@ -87,6 +88,8 @@ export class GenshinBuildScraper extends ScraperBase {
     let ggErrors = 0;
     for (const ch of characters) {
       processed++;
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, characters.length, ch.name);
       const originalId = String(
         ch.originalId ?? (ch.metadata as any)?.originalId ?? '',
       );

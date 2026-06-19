@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 import { EventType } from '@prisma/client';
 
 /**
@@ -58,12 +59,17 @@ export class BlablalinkEventScraper {
     }
 
     let count = 0;
+    let processed = 0;
     for (const [section, type] of Object.entries(SECTION_TYPE)) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
       // 섹션은 { items: [...] } 형태(일부는 배열일 수 있어 둘 다 허용).
       const raw = data[section];
       const items = Array.isArray(raw) ? raw : raw?.items;
       if (!Array.isArray(items)) continue;
       for (const it of items) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, undefined, (it.name || section || '').toString());
+        processed++;
         const start = Number(it.start_time);
         if (!Number.isFinite(start) || start <= 0) continue;
         const end = Number(it.end_time);

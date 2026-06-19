@@ -4,6 +4,7 @@ import logger from '../../../utils/logger';
 import { BASE_API_URL } from './utils';
 import { prisma } from '../../../utils/prisma';
 import { WutheringWavesDownloader } from '../../utils/WutheringWavesDownloader';
+import { crawlProgress } from '../../crawlProgress';
 
 export class WutheringWavesEchoScraper extends ScraperBase {
   constructor() {
@@ -60,7 +61,11 @@ export class WutheringWavesEchoScraper extends ScraperBase {
       const list = data.Echo || [];
       const results: ScrapedData[] = [];
 
+      let processed = 0;
       for (const item of list) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, list.length, item.Name);
+        processed++;
         const detailUrl = `${BASE_API_URL}/echo/${item.Id}`;
         let rawDetailData = item;
         try {

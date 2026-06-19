@@ -3,6 +3,7 @@ import { ScraperBase } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 import {
   BASE_WEAPON_LIST_URL,
   BASE_WEAPON_DETAIL_URL,
@@ -114,6 +115,9 @@ export class EndfieldWeaponScraper extends ScraperBase {
             name = weaponItem.engName.text;
           }
         }
+
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processedCount, list.length, name);
 
         logger.info(
           `[Endfield] Processing Weapon ${processedCount}/${list.length} (${name})...`,

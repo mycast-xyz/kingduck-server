@@ -3,6 +3,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { axiosGetWithRetry } from '../../utils/httpRetry';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 명조(WuWa) 추천 빌드 스크래퍼 — wuthering.gg/ko(커뮤니티 큐레이션) 소스.
@@ -112,6 +113,8 @@ export class WutheringWavesBuildScraper extends ScraperBase {
     const unmappedEcho = new Set<string>();
 
     for (const slug of slugs) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, slugs.length, slug);
       processed++;
       try {
         const html = await this.fetchGg(slug);

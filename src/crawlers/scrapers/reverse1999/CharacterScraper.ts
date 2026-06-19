@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class Reverse1999CharacterScraper extends ScraperBase {
   private readonly BASE_URL = 'https://www.reverse1999-simulator.com';
@@ -237,7 +238,11 @@ export class Reverse1999CharacterScraper extends ScraperBase {
         }
       }
 
+      let processed = 0;
       for (const id of targets) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, targets.length, id);
+        processed++;
         try {
           logger.info(`Processing character ${id}...`);
           const detailUrl = `${this.BASE_URL}/character/${id}`;

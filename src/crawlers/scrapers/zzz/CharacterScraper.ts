@@ -1,6 +1,7 @@
 import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 import * as cheerio from 'cheerio';
 
 /**
@@ -175,8 +176,12 @@ export class ZzzCharacterScraper extends ScraperBase {
 
     const results: ScrapedData[] = [];
     let errors = 0;
+    let processed = 0;
 
     for (const it of items) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, items.length, it.name);
+      processed++;
       try {
         const $ = cheerio.load(await this.getHtml(`${BASE}/ko/characters/${encodeURIComponent(it.slug)}`));
         const name = $('h1').first().text().trim() || it.name;

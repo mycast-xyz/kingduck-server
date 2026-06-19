@@ -3,6 +3,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 import {
   BASE_LIST_URL,
   BASE_DETAIL_URL,
@@ -189,6 +190,9 @@ export class EndfieldCharacterScraper extends ScraperBase {
         if (charItem.name && charItem.name.id && i18nMap[charItem.name.id]) {
           name = i18nMap[charItem.name.id];
         }
+
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processedCount, list.length, name);
 
         logger.info(
           `[Endfield] Processing ${processedCount}/${list.length} (${name})...`,

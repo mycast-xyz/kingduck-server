@@ -1,6 +1,7 @@
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 니케 속성 아이콘 스크래퍼 — blablalink(SHIFT UP 공식) 공개 정적 자산.
@@ -79,7 +80,11 @@ export class BlablalinkIconScraper {
 
     // 1) element/weapon → 기존 Element 행의 iconUrl 갱신(DamageType=element, Path=weapon).
     const elements = await prisma.element.findMany({ where: { gameId: game.id } });
+    let processed = 0;
     for (const el of elements) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, elements.length, el.name);
+      processed++;
       let file: string | undefined;
       let fileName: string | undefined;
       if (el.type === 'DamageType' && ELEMENT_CODE[el.name]) {

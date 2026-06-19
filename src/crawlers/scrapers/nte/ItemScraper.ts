@@ -3,6 +3,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 이환(NTE) 아이템 스크래퍼 — everness.info GraphQL.
@@ -123,7 +124,11 @@ export class NteItemScraper extends ScraperBase {
     try {
       const { arcs } = await this.gql<{ arcs: any[] }>(ARCS_QUERY);
       logger.info(`Found ${arcs?.length || 0} NTE arcs.`);
+      let processed = 0;
       for (const a of arcs || []) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, (arcs || []).length, a?.name || '');
+        processed++;
         try {
           const imageUrl = await this.downloadIcon(a.icon, 'arc', a.id);
           results.push({
@@ -159,7 +164,11 @@ export class NteItemScraper extends ScraperBase {
     try {
       const { shards } = await this.gql<{ shards: any[] }>(SHARDS_QUERY);
       logger.info(`Found ${shards?.length || 0} NTE shards (modules).`);
+      let processed = 0;
       for (const sd of shards || []) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed, (shards || []).length, sd?.name || '');
+        processed++;
         try {
           const imageUrl = await this.downloadIcon(sd.icon, 'module', sd.id);
           results.push({

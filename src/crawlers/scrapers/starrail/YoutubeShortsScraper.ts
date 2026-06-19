@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class YoutubeShortsScraper extends ScraperBase {
   private readonly CHANNEL_HANDLE = '@Honkaistarrail_kr';
@@ -65,6 +66,7 @@ export class YoutubeShortsScraper extends ScraperBase {
 
       // 2. Fetch videos from the uploads playlist
       let pageCount = 0;
+      let processedVideos = 0;
       do {
         pageCount++;
         const response: any = await youtube.playlistItems.list({
@@ -80,6 +82,12 @@ export class YoutubeShortsScraper extends ScraperBase {
         );
 
         for (const item of items) {
+          if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+          crawlProgress.report(
+            processedVideos++,
+            undefined,
+            item.snippet?.title || '',
+          );
           const videoId = item.snippet?.resourceId?.videoId;
           const title = item.snippet?.title || '';
           const thumbnail =

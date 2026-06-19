@@ -4,6 +4,7 @@ import logger from '../../../utils/logger';
 import { BASE_API_URL } from './utils';
 import { WutheringWavesDownloader } from '../../utils/WutheringWavesDownloader';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 export class WutheringWavesCharacterScraper extends ScraperBase {
   constructor() {
@@ -77,6 +78,8 @@ export class WutheringWavesCharacterScraper extends ScraperBase {
       const totalCount = list.length;
 
       for (const item of list) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processedCount, totalCount, item.Name);
         processedCount++;
         logger.info(
           `[WW-Char] Processing character ${processedCount}/${totalCount} (${item.Name}) - ${((processedCount / totalCount) * 100).toFixed(1)}%`,

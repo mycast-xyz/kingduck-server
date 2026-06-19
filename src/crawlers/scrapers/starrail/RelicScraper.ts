@@ -3,6 +3,7 @@ import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
 import { fetchPageConfig, srsAssetUrl, SRS_BASE } from '../../utils/srsPageConfig';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 유물(RelicSet) 스크래퍼 — starrailstation.com 단독 소스.
@@ -47,6 +48,8 @@ export class RelicScraper extends ScraperBase {
     let processed = 0;
     let errors = 0;
     for (const entry of entries) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, entry.name);
       processed++;
       const originalId = String(entry.pageId ?? '');
       if (!originalId) {

@@ -3,6 +3,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 이환(異環 / Neverness to Everness, NTE) 캐릭터(이능력자/Esper) 스크래퍼.
@@ -162,8 +163,12 @@ export class NteCharacterScraper extends ScraperBase {
 
     const results: ScrapedData[] = [];
     let errors = 0;
+    let processed = 0;
 
     for (const e of espers) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, espers.length, e.name);
+      processed++;
       try {
         const detail = (
           await this.gql<{ esper: any }>(DETAIL_QUERY, { id: e.id })

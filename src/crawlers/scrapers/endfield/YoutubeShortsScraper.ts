@@ -2,6 +2,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { youtube } from '../../../utils/youtubeApiClient';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class EndfieldYoutubeShortsScraper extends ScraperBase {
   private readonly CHANNEL_HANDLE = '@arknightsendfieldKR'; // Official KR Channel
@@ -103,7 +104,14 @@ export class EndfieldYoutubeShortsScraper extends ScraperBase {
       // 4. Filter Shorts and match characters
       const requiredKeywords = ['코드명', '오퍼레이터'];
 
+      let processed = 0;
       for (const video of videoDetails) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(
+          processed++,
+          videoDetails.length,
+          video.snippet?.title || '',
+        );
         const duration = video.contentDetails?.duration;
         const durationSeconds = this.parseDuration(duration);
 

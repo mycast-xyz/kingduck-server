@@ -4,6 +4,7 @@ import path from 'path';
 import initSqlJs from 'sql.js';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 export class TrickcalScraper {
   private dbUrl =
@@ -125,6 +126,8 @@ export class TrickcalScraper {
     let charCount = 0;
 
     for (const hero of heroes) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(charCount, heroes.length, hero.name_kr || '');
       // Validation
       if (!hero.name_kr) continue;
 
@@ -185,6 +188,8 @@ export class TrickcalScraper {
     let itemCount = 0;
 
     for (const equip of equipments) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(itemCount, equipments.length, equip.name || '');
       if (!equip.name || equip.name === '[정보 없음]') continue;
 
       const itemData = {

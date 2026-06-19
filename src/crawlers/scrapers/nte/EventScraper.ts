@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 import { EventType } from '@prisma/client';
 
 /**
@@ -71,7 +72,11 @@ export class NteEventScraper {
     logger.info(`Found ${events.length} NTE events.`);
 
     let count = 0;
+    let processed = 0;
     for (const ev of events) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, events.length, ev.name);
+      processed++;
       const start = this.parseDate(ev.start);
       if (!start) {
         logger.warn(`[nte/event] skip "${ev.name}" — invalid start date.`);

@@ -5,6 +5,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
 import { EventType } from '@prisma/client';
+import { crawlProgress } from '../../crawlProgress';
 
 export class EventScraper extends ScraperBase {
   private readonly API_URL =
@@ -47,7 +48,10 @@ export class EventScraper extends ScraperBase {
       const list = response.data.data.list;
       logger.info(`Fetched ${list.length} posts.`);
 
+      let processed = 0;
       for (const item of list) {
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processed++, list.length, item.post?.subject || '');
         const post = item.post;
 
         // Try to find Korean subject

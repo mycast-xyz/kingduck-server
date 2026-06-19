@@ -3,6 +3,7 @@ import { ImageDownloader } from '../../utils/ImageDownloader';
 import { axiosGetWithRetry } from '../../utils/httpRetry';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 원신 재료(아이템) 스크래퍼 — Ambr(gi.yatta.moe) 소스.
@@ -61,6 +62,8 @@ export class GenshinMaterialScraper extends ScraperBase {
     let errors = 0;
     for (const entry of entries) {
       processed++;
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, entry.name);
       const originalId = String(entry.id ?? '');
       if (!originalId) {
         logger.warn(`Material entry missing id: ${entry.name}`);

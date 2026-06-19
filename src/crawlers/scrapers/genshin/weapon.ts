@@ -3,6 +3,7 @@ import { ImageDownloader } from '../../utils/ImageDownloader';
 import { axiosGetWithRetry } from '../../utils/httpRetry';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 원신 무기 스크래퍼 — Ambr(gi.yatta.moe) 소스. character.ts와 동일 패턴.
@@ -68,6 +69,8 @@ export class GenshinWeaponScraper extends ScraperBase {
     let detailErrors = 0;
     for (const entry of entries) {
       processed++;
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, entries.length, entry.name);
       const originalId = String(entry.id ?? '');
       if (!originalId) {
         logger.warn(`Weapon entry missing id: ${entry.name}`);

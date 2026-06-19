@@ -3,6 +3,7 @@ import { ScraperBase } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 import {
   BASE_EQUIPMENT_SUIT_LIST_URL,
   BASE_EQUIPMENT_SUIT_DETAIL_URL,
@@ -99,6 +100,8 @@ export class EndfieldEquipmentScraper extends ScraperBase {
       for (const suitEntry of suits as any[]) {
         processedCount++;
         const suitId = suitEntry.suitId; // e.g., "suit_burst01"
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processedCount, suits.length, suitId);
 
         logger.info(
           `[Endfield] Processing Suit ${processedCount}/${suits.length} (${suitId})...`,

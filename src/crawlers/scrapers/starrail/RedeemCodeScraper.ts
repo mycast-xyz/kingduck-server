@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import puppeteer from 'puppeteer';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 const HSR_GAME_SLUG = 'starrail';
 const ARCA_URL = 'https://arca.live/b/hkstarrail/132589689?mode=best&p=1';
@@ -171,7 +172,10 @@ export class RedeemCodeScraper {
     }
 
     // Upsert Codes
+    let processed = 0;
     for (const codeStr of data.codes) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed++, data.codes.length, codeStr);
       try {
         await this.prisma.redeemCode.upsert({
           where: { code: codeStr },

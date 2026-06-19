@@ -3,6 +3,7 @@ import { ScraperBase, ScrapedData } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
+import { crawlProgress } from '../../crawlProgress';
 
 /**
  * 블루 아카이브(Blue Archive) 학생(캐릭터) 스크래퍼.
@@ -194,9 +195,13 @@ export class BlueArchiveCharacterScraper extends ScraperBase {
 
     const results: ScrapedData[] = [];
     let errors = 0;
+    let processed = 0;
     const roleSet = new Set<string>();
 
     for (const s of students) {
+      if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+      crawlProgress.report(processed, students.length, s.Name);
+      processed++;
       try {
         roleSet.add(s.TacticRole);
 

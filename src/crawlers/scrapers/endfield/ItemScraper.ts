@@ -3,6 +3,7 @@ import { ScraperBase } from '../../core/ScraperBase';
 import { ImageDownloader } from '../../utils/ImageDownloader';
 import logger from '../../../utils/logger';
 import { prisma } from '../../../utils/prisma';
+import { crawlProgress } from '../../crawlProgress';
 import { BASE_ITEM_LIST_URL, HEADERS, I18N_URLS } from './utils';
 
 // Helper to recursively resolve localization IDs (copied from EquipmentScraper)
@@ -91,6 +92,8 @@ export class EndfieldItemScraper extends ScraperBase {
       for (const itemEntry of items as any[]) {
         processedCount++;
         const itemId = itemEntry.id;
+        if (crawlProgress.shouldStop()) break; // 사용자 중단 요청
+        crawlProgress.report(processedCount, items.length, String(itemId ?? ''));
 
         // Log sparingly
         if (processedCount % 10 === 0) {
