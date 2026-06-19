@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { ScrapedData } from '../core/ScraperBase';
 import logger from '../../utils/logger';
+import { responseCache } from '../../utils/responseCache';
 
 export class DataSyncService {
   /**
@@ -294,6 +295,7 @@ export class DataSyncService {
     logger.info(
       `Sync complete for ${gameSlug}. Success: ${successCount}, Errors: ${errorCount}`,
     );
+    responseCache.clearAll(); // 캐릭터 데이터 변경 → 읽기 캐시 무효화(+메모리 반납)
 
     // 데이터 공백 요약 — 스케줄러가 crawler_log.metadata에 기록(로그 상세 모달에 노출).
     const byKey: Record<string, number> = {};
@@ -394,6 +396,7 @@ export class DataSyncService {
     logger.info(
       `Sync complete for ${gameSlug} items. Success: ${successCount}, Errors: ${errorCount}`,
     );
+    responseCache.clearAll(); // 아이템 변경 → 읽기 캐시 무효화
   }
 
   /**
@@ -529,5 +532,6 @@ export class DataSyncService {
     logger.info(
       `Sync complete. Success: ${successCount}, Errors: ${errorCount}`,
     );
+    responseCache.clearAll(); // 영상 변경 → 읽기 캐시 무효화
   }
 }
