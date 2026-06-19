@@ -10,29 +10,19 @@ export class WutheringWavesItemScraper extends ScraperBase {
     super('wutheringwaves');
   }
 
-  // Recursively traverse and handle images
-  private async processDeep(obj: any): Promise<any> {
-    if (Array.isArray(obj)) {
-      return Promise.all(obj.map((item) => this.processDeep(item)));
-    } else if (typeof obj === 'object' && obj !== null) {
-      const newObj: any = {};
-      for (const key in obj) {
-        const val = obj[key];
-        if (
-          typeof val === 'string' &&
-          (val.startsWith('http') ||
-            val.startsWith('/Game/') ||
-            val.match(/\.(png|jpg|jpeg|mp4)$/))
-        ) {
-          // Download and replace with local path
-          newObj[key] = await WutheringWavesDownloader.downloadAsset(val);
-        } else {
-          newObj[key] = await this.processDeep(val);
-        }
-      }
-      return newObj;
+  /**
+   * 아이콘 후보(http 또는 /Game/ 경로)만 골라 다운로드한다. 그 외 값은 그대로 둔다.
+   * (예전 구현은 detail 전체를 재귀 순회하며 /Game/로 시작하는 모든 문자열 — Mesh/EntityConfig 등
+   *  비이미지 자산까지 — 다운로드해 2128개 아이템 × 다수 요청으로 크롤이 수 시간 멈췄다. B-크롤 hang.)
+   */
+  private async downloadIcon(val: any): Promise<any> {
+    if (
+      typeof val === 'string' &&
+      (val.startsWith('http') || val.startsWith('/Game/'))
+    ) {
+      return WutheringWavesDownloader.downloadAsset(val);
     }
-    return obj;
+    return val;
   }
 
   async scrape(limit?: number): Promise<ScrapedData[]> {
@@ -69,47 +59,65 @@ export class WutheringWavesItemScraper extends ScraperBase {
 
       for (const item of list) {
         processedScrape++;
-        if (processedScrape % 10 === 0 || processedScrape === totalScrape) {
+        if (processedScrape % 50 === 0 || processedScrape === totalScrape) {
           logger.info(
             `[WW-Item] Scraping progress: ${processedScrape}/${totalScrape} (${((processedScrape / totalScrape) * 100).toFixed(1)}%)`,
           );
         }
-        const detailUrl = `${BASE_API_URL}/item/${item.Id}`;
-        let rawDetailData = item;
+
         try {
-          const { data: detail } = await axiosGetWithRetry<any>(detailUrl, {
-            timeout: 15000,
+          const detailUrl = `${BASE_API_URL}/item/${item.Id}`;
+          let detailData: any = item;
+          try {
+            const { data: detail } = await axiosGetWithRetry<any>(detailUrl, {
+              timeout: 15000,
+            });
+            detailData = { ...item, ...detail };
+          } catch (err) {
+            logger.warn(`Failed to fetch detail for item ${item.Id}:`, err);
+          }
+
+          // 이미지는 실제 표시에 쓰는 3개 아이콘만 다운로드(detail 전체 재귀 다운로드 금지 — hang 방지).
+          const [icon, iconMiddle, iconSmall] = await Promise.all([
+            this.downloadIcon(detailData.Icon),
+            this.downloadIcon(detailData.IconMiddle),
+            this.downloadIcon(detailData.IconSmall),
+          ]);
+
+          // type 분류: list의 TypeName(한국어). syncItems가 metadata.type을 읽으므로 반드시 채운다
+          // (예전엔 metadata.type 누락 → 전건 'Unknown'으로 적재됨). 빈 값은 'Item'으로 폴백.
+          const itemType = item.TypeName || detailData.TypeName || 'Item';
+
+          results.push({
+            gameId: gameId,
+            type: itemType,
+            name: detailData.Name,
+            sourceUrl: detailUrl,
+            imageUrl: icon || '',
+            rarity: detailData.QualityId || 1,
+            description:
+              detailData.AttributesDescription ||
+              detailData.BgDescription ||
+              '',
+            metadata: {
+              sourceUrl: detailUrl,
+              originalId: item.Id,
+              type: itemType, // ← syncItems가 읽는 분류 키
+              typeId: item.ItemType ?? item.TypeId,
+              rawType: item.TypeName,
+              bgDescription: detailData.BgDescription,
+              icon,
+              iconMiddle,
+              iconSmall,
+            },
           });
-          rawDetailData = { ...item, ...detail };
         } catch (err) {
-          logger.warn(`Failed to fetch detail for item ${item.Id}:`, err);
+          // 단일 아이템 실패가 전체 크롤을 죽이지 않도록 격리.
+          logger.warn(`Failed to process item ${item.Id}:`, err);
         }
 
-        // Process images recursively
-        const detailData = await this.processDeep(rawDetailData);
-
-        const localImageUrl = detailData.Icon || '';
-
-        results.push({
-          gameId: gameId,
-          type: item.TypeName || 'Item',
-          name: detailData.Name,
-          sourceUrl: detailUrl,
-          imageUrl: localImageUrl,
-          rarity: detailData.QualityId || 1,
-          description:
-            detailData.AttributesDescription || detailData.BgDescription || '',
-          metadata: {
-            sourceUrl: detailUrl,
-            originalId: item.Id,
-            typeId: item.ItemType,
-            rawType: item.TypeName,
-            bgDescription: detailData.BgDescription,
-            iconMiddle: detailData.IconMiddle,
-            iconSmall: detailData.IconSmall,
-            raw: detailData,
-          },
-        });
+        // 외부 API/이미지 서버 예의 — 과도한 동시/연속 요청 방지(가벼운 딜레이).
+        await this.delay(20);
       }
 
       return results;

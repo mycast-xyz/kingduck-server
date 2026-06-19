@@ -84,7 +84,14 @@ export class DataSyncService {
     'wutheringwaves',
     'zzz',
   ];
-  private static readonly GAMES_WITH_BUILD = ['genshin', 'starrail', 'zzz'];
+  // wutheringwaves: BuildScraper가 syncCharacters를 쓰지 않아 detectGaps는 실제로 안 돌지만,
+  // 데이터 공백 추적 대상임을 명시(향후 wuwa가 syncCharacters를 채택하면 즉시 반영). 기획안 요청.
+  private static readonly GAMES_WITH_BUILD = [
+    'genshin',
+    'starrail',
+    'zzz',
+    'wutheringwaves',
+  ];
 
   /**
    * 크롤 시점에 "기대되는 데이터가 비었는지" 감지 → 공백 키 배열(image/skills/recommendations).

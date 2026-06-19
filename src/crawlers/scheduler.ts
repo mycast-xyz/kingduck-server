@@ -18,6 +18,7 @@ import { WutheringWavesCharacterScraper } from './scrapers/wutheringwaves/Charac
 import { WutheringWavesWeaponScraper } from './scrapers/wutheringwaves/WeaponScraper';
 import { WutheringWavesEchoScraper } from './scrapers/wutheringwaves/EchoScraper';
 import { WutheringWavesItemScraper } from './scrapers/wutheringwaves/ItemScraper';
+import { WutheringWavesBuildScraper } from './scrapers/wutheringwaves/BuildScraper';
 import { RedeemCodeScraper as WutheringWavesRedeemCodeScraper } from './scrapers/wutheringwaves/RedeemCodeScraper';
 import { YoutubeShortsScraper as WutheringWavesYoutubeShortsScraper } from './scrapers/wutheringwaves/YoutubeShortsScraper';
 import { EndfieldCharacterScraper } from './scrapers/endfield/CharacterScraper';
@@ -265,6 +266,19 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new WutheringWavesItemScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncItems('wutheringwaves', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'wutheringwaves',
+    // 추천(무기/에코 세트) — wuthering.gg/ko. character·weapon·echo 선행 필요(이름→id 매핑).
+    // syncCharacters를 쓰지 않고 BuildScraper.save()가 metadata만 read-merge한다
+    // (wuwa Element type 'element'/'weapon' 보존 — BuildScraper 주석 참고).
+    type: 'build',
+    run: async (s) => {
+      const scraper = new WutheringWavesBuildScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await scraper.save(data);
       return data.length;
     },
   },
