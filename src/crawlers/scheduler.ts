@@ -34,6 +34,7 @@ import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/ni
 import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { NteCharacterScraper } from './scrapers/nte/CharacterScraper';
+import { BlueArchiveCharacterScraper } from './scrapers/bluearchive/CharacterScraper';
 import { NteItemScraper } from './scrapers/nte/ItemScraper';
 import { NteYoutubeShortsScraper } from './scrapers/nte/YoutubeShortsScraper';
 import { NteEventScraper } from './scrapers/nte/EventScraper';
@@ -519,6 +520,19 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new NteRedeemCodeScraper();
       const result = await scraper.scrape();
       return result ? result.codes.length : 0;
+    },
+  },
+
+  // --- 블루 아카이브(Blue Archive) ---
+  {
+    game: 'bluearchive',
+    type: 'character',
+    // SchaleDB 공개 JSON(학생) — 공격/방어속성 Element + 역할/학교 metadata 필터 + 스킬.
+    run: async (s) => {
+      const scraper = new BlueArchiveCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('bluearchive', data);
+      return data.length;
     },
   },
 ];

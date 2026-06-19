@@ -55,15 +55,23 @@ export const getCharacterList = async (
     },
   });
 
-  // metadata에서 class/corp/burst 3필드만 JSON path 추출 (full metadata 로드 금지 — 성능).
-  // 니케 외 게임도 동일 쿼리를 실행하지만 값이 없으면 null을 반환하므로 영향 없음.
-  type MetaRow = { id: number | bigint; class: string | null; corp: string | null; burst: string | null };
+  // metadata에서 클라이언트 필터용 필드만 JSON path 추출 (full metadata 로드 금지 — 성능).
+  // 니케(class/corp/burst) + 블루아카이브(school). 해당 게임 외엔 값이 없어 null → 영향 없음.
+  // (역할은 Character.role 컬럼에 저장되어 위 select가 이미 반환하므로 여기서 추출하지 않는다.)
+  type MetaRow = {
+    id: number | bigint;
+    class: string | null;
+    corp: string | null;
+    burst: string | null;
+    school: string | null;
+  };
   const metaRows = await prisma.$queryRaw<MetaRow[]>(
     Prisma.sql`
       SELECT id,
-        metadata->>'class' AS "class",
-        metadata->>'corp'  AS "corp",
-        metadata->>'burst' AS "burst"
+        metadata->>'class'  AS "class",
+        metadata->>'corp'   AS "corp",
+        metadata->>'burst'  AS "burst",
+        metadata->>'school' AS "school"
       FROM characters
       WHERE game_id = (SELECT id FROM games WHERE slug = ${gameSlug})
       ORDER BY id ASC
@@ -79,6 +87,7 @@ export const getCharacterList = async (
       class: meta?.class ?? null,
       corp: meta?.corp ?? null,
       burst: meta?.burst ?? null,
+      school: meta?.school ?? null,
     };
   });
 };

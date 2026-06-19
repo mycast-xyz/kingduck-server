@@ -47,6 +47,11 @@ async function main() {
       name: '이환',
       icon: 'nte.webp',
     },
+    {
+      slug: 'bluearchive',
+      name: '블루 아카이브',
+      icon: 'bluearchive.webp',
+    },
   ];
 
   for (const g of games) {
