@@ -108,6 +108,9 @@ router.post(
  */
 router.get('/character/list', AdminController.getCharacterList);
 
+// 데이터 공백(재크롤 필요) 집계 — metadata.dataGaps 기반
+router.get('/data-gaps', AdminController.getDataGaps);
+
 /**
  * @swagger
  * /api/v0/admin/item/list:

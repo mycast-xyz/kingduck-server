@@ -342,6 +342,76 @@ export class AdminController {
   }
 
   /**
+   * 데이터 공백(누락) 목록 — 크롤이 채우지 못한 캐릭터를 게임별로 집계.
+   * metadata.dataGaps(크롤 시점 감지)가 비어있지 않은 캐릭터 = "나중에 재크롤 필요".
+   * GET /api/v0/admin/data-gaps
+   */
+  async getDataGaps(_req: Request, res: Response): Promise<void> {
+    try {
+      const rows = await prisma.$queryRaw<
+        Array<{
+          slug: string;
+          gameName: string;
+          id: number;
+          name: string;
+          originalId: string | null;
+          gaps: string[];
+        }>
+      >`
+        SELECT g.slug, g.name AS "gameName", c.id, c.name,
+               c.original_id AS "originalId", c.metadata->'dataGaps' AS gaps
+        FROM characters c JOIN games g ON c.game_id = g.id
+        WHERE jsonb_array_length(COALESCE(c.metadata->'dataGaps', '[]'::jsonb)) > 0
+        ORDER BY g.slug, c.id
+      `;
+      const totals = await prisma.$queryRaw<
+        Array<{ slug: string; total: number }>
+      >`
+        SELECT g.slug, COUNT(*)::int AS total
+        FROM characters c JOIN games g ON c.game_id = g.id
+        GROUP BY g.slug
+      `;
+      const totalMap = new Map(totals.map((t) => [t.slug, Number(t.total)]));
+
+      const byGame = new Map<
+        string,
+        {
+          slug: string;
+          gameName: string;
+          total: number;
+          items: { name: string; originalId: string | null; missing: string[] }[];
+        }
+      >();
+      for (const r of rows) {
+        if (!byGame.has(r.slug)) {
+          byGame.set(r.slug, {
+            slug: r.slug,
+            gameName: r.gameName,
+            total: totalMap.get(r.slug) || 0,
+            items: [],
+          });
+        }
+        byGame.get(r.slug)!.items.push({
+          name: r.name,
+          originalId: r.originalId,
+          missing: Array.isArray(r.gaps) ? r.gaps : [],
+        });
+      }
+      const games = [...byGame.values()].map((g) => ({
+        ...g,
+        gapCount: g.items.length,
+        completeness: g.total
+          ? Math.round(((g.total - g.items.length) / g.total) * 100)
+          : 100,
+      }));
+      sendOk(res, { games });
+    } catch (error) {
+      logger.error('getDataGaps Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류' });
+    }
+  }
+
+  /**
    * 아이템 목록 조회 (페이지네이션, 검색)
    * GET /api/v0/admin/item/list
    */
