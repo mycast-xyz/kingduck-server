@@ -20,7 +20,14 @@ export class Browser {
         logger.info('Launching Puppeteer browser...');
         this.browser = await puppeteer.launch({
           headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            // 저메모리(홈서버 4GB) 안정화: /dev/shm 대신 일반 메모리/디스크 사용(OOM·크래시 방지),
+            // GPU 비활성.
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+          ],
         });
       } catch (error) {
         logger.error('Failed to launch browser', error);

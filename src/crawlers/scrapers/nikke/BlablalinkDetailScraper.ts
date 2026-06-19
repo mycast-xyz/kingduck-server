@@ -99,8 +99,21 @@ export class BlablalinkDetailScraper {
 
     let success = 0;
     let failed = 0;
+    // 홈서버(4GB) 안정화: N개마다 브라우저 재시작(Chromium 메모리 반납), 연속 실패 누적 시 중단.
+    let processed = 0;
+    let consecFail = 0;
+    const RESTART_EVERY = 40; // 40개 렌더마다 브라우저 재시작
+    const MAX_CONSEC_FAIL = 20; // 연속 20회 실패면 소스 차단/다운으로 보고 중단
 
     for (const ch of characters) {
+      // 연속 실패가 임계치를 넘으면(소스 차단/다운 추정) 더 갈수록 손해 → 중단.
+      if (consecFail >= MAX_CONSEC_FAIL) {
+        logger.error(
+          `[nikke/detail] ${consecFail} consecutive failures — source likely blocking/down. Aborting (${success} enriched, ${failed} failed).`,
+        );
+        break;
+      }
+
       const meta = (ch.metadata as Record<string, any>) || {};
       const resourceId = meta.resourceId;
       if (resourceId == null) {
@@ -108,6 +121,16 @@ export class BlablalinkDetailScraper {
         failed++;
         continue;
       }
+
+      // 메모리 반납: 일정 개수마다 브라우저 재시작(페이지 close만으론 Chromium 프로세스가 누적됨).
+      if (processed > 0 && processed % RESTART_EVERY === 0) {
+        await browser.close();
+        await browser.init();
+        logger.info(
+          `[nikke/detail] browser restarted at ${processed} renders (memory release).`,
+        );
+      }
+      processed++;
 
       const page = await browser.getPage();
       let captured: string | null = null;
@@ -134,6 +157,7 @@ export class BlablalinkDetailScraper {
             `[nikke/detail] ${ch.name} (#${ch.id}, res=${resourceId}): detail JSON not captured.`,
           );
           failed++;
+          consecFail++;
           continue;
         }
 
@@ -221,11 +245,13 @@ export class BlablalinkDetailScraper {
         });
 
         success++;
+        consecFail = 0; // 성공 → 연속 실패 카운터 리셋
         logger.info(
           `[nikke/detail] ${ch.name} (#${ch.id}): skills=${skills.length}, costumes=${costumes.length}, cv="${cv}".`,
         );
       } catch (e) {
         failed++;
+        consecFail++;
         logger.error(
           `[nikke/detail] ${ch.name} (#${ch.id}, res=${resourceId}) failed:`,
           e instanceof Error ? e.message : e,
