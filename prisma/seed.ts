@@ -42,6 +42,11 @@ async function main() {
       name: '명일방주:엔드필드',
       icon: 'endfield.webp',
     },
+    {
+      slug: 'nte',
+      name: '이환',
+      icon: 'nte.webp',
+    },
   ];
 
   for (const g of games) {

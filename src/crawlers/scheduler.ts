@@ -33,6 +33,7 @@ import { BlablalinkDetailScraper } from './scrapers/nikke/BlablalinkDetailScrape
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
 import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
+import { NteCharacterScraper } from './scrapers/nte/CharacterScraper';
 import { ZzzItemScraper } from './scrapers/zzz/ItemScraper';
 import { ZzzBuildScraper } from './scrapers/zzz/BuildScraper';
 import { ZzzYoutubeScraper } from './scrapers/zzz/YoutubeShortsScraper';
@@ -459,6 +460,19 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new ZzzYoutubeScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncVideos('zzz', data);
+      return data.length;
+    },
+  },
+
+  // --- 이환(異環 / Neverness to Everness, NTE) ---
+  {
+    game: 'nte',
+    type: 'character',
+    // everness.info GraphQL(이능력자/Esper) — 속성(DamageType)/형질(Path) Element + 스킬.
+    run: async (s) => {
+      const scraper = new NteCharacterScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('nte', data);
       return data.length;
     },
   },
