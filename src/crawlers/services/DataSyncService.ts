@@ -4,6 +4,12 @@ import logger from '../../utils/logger';
 
 export class DataSyncService {
   /**
+   * 강제 덮어쓰기 모드. 어드민 "덮어쓰기 실행"(강제 새로고침)이 크롤 전 true로 설정 →
+   * Element.iconUrl을 값이 있어도 덮어쓴다(평소엔 빈 경우만). 추천/빌드 키는 그래도 보존.
+   */
+  public forceOverwrite = false;
+
+  /**
    * 게임의 Element를 한 번에 선로딩한 뒤, 캐릭터 동기화 루프에서 캐릭터마다 find 쿼리를
    * 날리지 않고 element/path id를 해석하는 리졸버를 만든다(N+1 방지, B-H5).
    *
@@ -32,12 +38,19 @@ export class DataSyncService {
       const cached = cache.get(key);
       if (cached !== undefined) {
         // 스크래퍼가 아이콘을 주고 기존 행 아이콘이 비어있으면 채운다(서버 크롤로 속성 아이콘 적재).
-        // 이미 값이 있으면(어드민 수동 설정 등) 덮지 않는다.
+        // 이미 값이 있으면(어드민 수동 설정 등) 덮지 않는다 — 단, 강제 덮어쓰기면 무조건 갱신.
         if (iconUrl) {
-          await prisma.element.updateMany({
-            where: { id: cached, OR: [{ iconUrl: null }, { iconUrl: '' }] },
-            data: { iconUrl },
-          });
+          if (this.forceOverwrite) {
+            await prisma.element.update({
+              where: { id: cached },
+              data: { iconUrl },
+            });
+          } else {
+            await prisma.element.updateMany({
+              where: { id: cached, OR: [{ iconUrl: null }, { iconUrl: '' }] },
+              data: { iconUrl },
+            });
+          }
         }
         return cached;
       }

@@ -40,6 +40,12 @@ export class ImageDownloader {
   };
 
   /**
+   * 강제 덮어쓰기 모드. 어드민 "덮어쓰기 실행"(강제 새로고침)이 크롤 전 true로 설정 →
+   * 이미 존재하는 이미지도 skip하지 않고 재다운로드. 크롤 종료 후 다시 false로 리셋한다.
+   */
+  public static forceOverwrite = false;
+
+  /**
    * Downloads an image from a URL, converts it to WebP, and saves it.
    * @param url The source URL of the image.
    * @param gameSlug The game identifier (e.g., 'starrail', 'genshin', 'zzz').
@@ -64,8 +70,8 @@ export class ImageDownloader {
         fs.mkdirSync(dirPath, { recursive: true });
       }
 
-      // Check if already exists (Skip if exists to save bandwidth)
-      if (fs.existsSync(filePath)) {
+      // Check if already exists (Skip if exists to save bandwidth) — 단, 강제 덮어쓰기면 재다운로드.
+      if (!ImageDownloader.forceOverwrite && fs.existsSync(filePath)) {
         logger.info(
           `Image already exists, skipping: ${gameSlug}/${category}/${fileName}.webp`,
         );

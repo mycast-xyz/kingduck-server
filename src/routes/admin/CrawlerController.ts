@@ -4,6 +4,7 @@ import { CrawlerStatus } from '@prisma/client';
 import { CRAWLER_TASKS } from '../../crawlers/scheduler';
 import { DataSyncService } from '../../crawlers/services/DataSyncService';
 import { Browser } from '../../crawlers/core/Browser';
+import { ImageDownloader } from '../../crawlers/utils/ImageDownloader';
 import logger from '../../utils/logger';
 
 export class CrawlerController {
@@ -202,7 +203,11 @@ export class CrawlerController {
    */
   runCrawler = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { gameSlug, crawlerType } = req.body;
+      const { gameSlug, crawlerType, mode } = req.body;
+      // 실행 모드: 'normal'(기본) | 'force'(강제 새로고침: 이미지/아이콘 재다운로드·덮어쓰기, 추천 보존)
+      //          | 'purge'(완전 재구축: 캐릭터 데이터 비우고 재크롤 — character 타입만)
+      const runMode: 'normal' | 'force' | 'purge' =
+        mode === 'force' || mode === 'purge' ? mode : 'normal';
 
       if (!gameSlug || !crawlerType) {
         res.status(400).json({
@@ -301,6 +306,16 @@ export class CrawlerController {
         },
       });
 
+      // 실행 모드 적용: force/purge면 이미지·아이콘 강제 덮어쓰기(추천/빌드 키는 보존).
+      const force = runMode === 'force' || runMode === 'purge';
+      syncService.forceOverwrite = force;
+      ImageDownloader.forceOverwrite = force;
+      // 완전 재구축: character 크롤에 한해 캐릭터(+영상) 비우고 재크롤.
+      if (runMode === 'purge' && crawlerType === 'character') {
+        await syncService.purgeCharacters(gameSlug);
+        logger.warn(`Purge before re-crawl: ${gameSlug}/${crawlerType}`);
+      }
+
       // 백그라운드 실행. 이 태스크의 데이터 공백 요약만 기록되도록 리셋.
       syncService.lastSyncGaps = null;
       task
@@ -332,6 +347,10 @@ export class CrawlerController {
               errorMsg: error instanceof Error ? error.message : String(error),
             },
           });
+        })
+        .finally(() => {
+          // 전역 강제 플래그는 다른 실행에 영향 주지 않도록 반드시 리셋.
+          ImageDownloader.forceOverwrite = false;
         });
 
       // 5. 즉시 응답 (방금 생성한 로그 정보를 반환)
