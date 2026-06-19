@@ -32,6 +32,9 @@ import { BlablalinkDetailScraper } from './scrapers/nikke/BlablalinkDetailScrape
 import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/nikke/YoutubeShortsScraper';
 import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
+import { ZzzItemScraper } from './scrapers/zzz/ItemScraper';
+import { ZzzBuildScraper } from './scrapers/zzz/BuildScraper';
+import { ZzzYoutubeScraper } from './scrapers/zzz/YoutubeShortsScraper';
 import { DataSyncService } from './services/DataSyncService';
 import { Browser } from './core/Browser';
 import logger from '../utils/logger';
@@ -409,6 +412,39 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new ZzzCharacterScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncCharacters('zzz', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'zzz',
+    // W-Engine(무기) + DriveDisc(드라이브 디스크 세트). 추천 매핑의 선행(이름→id).
+    type: 'item',
+    run: async (s) => {
+      const scraper = new ZzzItemScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('zzz', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'zzz',
+    // 추천(W-엔진/디스크/팀) — genshin.gg/zzz. character·item 선행 필요(이름→id 매핑).
+    type: 'build',
+    run: async (s) => {
+      const scraper = new ZzzBuildScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncCharacters('zzz', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'zzz',
+    // 공식 한국 채널(@ZZZ_KO) 캐릭터 영상. character 선행 필요(제목 매칭).
+    type: 'video',
+    run: async (s) => {
+      const scraper = new ZzzYoutubeScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('zzz', data);
       return data.length;
     },
   },

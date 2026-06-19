@@ -84,7 +84,7 @@ export class DataSyncService {
     'wutheringwaves',
     'zzz',
   ];
-  private static readonly GAMES_WITH_BUILD = ['genshin', 'starrail'];
+  private static readonly GAMES_WITH_BUILD = ['genshin', 'starrail', 'zzz'];
 
   /**
    * 크롤 시점에 "기대되는 데이터가 비었는지" 감지 → 공백 키 배열(image/skills/recommendations).
@@ -108,7 +108,9 @@ export class DataSyncService {
       const hasRec =
         (Array.isArray(meta?.recommendedWeapons) &&
           meta.recommendedWeapons.length > 0) ||
-        (Array.isArray(meta?.lightcones) && meta.lightcones.length > 0);
+        (Array.isArray(meta?.lightcones) && meta.lightcones.length > 0) ||
+        (Array.isArray(meta?.recommendedWEngines) &&
+          meta.recommendedWEngines.length > 0);
       if (!hasRec) gaps.push('recommendations');
     }
     return gaps;
@@ -175,6 +177,10 @@ export class DataSyncService {
             'recommendedRelics',
             'recommendedEchoes',
             'echoSets',
+            // zzz 추천(BuildScraper) — character 재크롤이 덮지 않도록 보존
+            'recommendedWEngines',
+            'driveDiscs',
+            'recommendedStats',
           ];
           const merged: Record<string, any> = { ...newMeta };
           for (const k of PRESERVE_KEYS) {
