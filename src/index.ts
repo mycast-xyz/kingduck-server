@@ -144,6 +144,52 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// SEO 사이트맵 — 정적 페이지 + 게임 섹션 + 전 캐릭터 상세 URL. robots.txt가 참조하고 서치콘솔에 제출.
+app.get('/sitemap.xml', async (_req, res) => {
+  try {
+    const SITE = 'https://www.kingduck.xyz';
+    const [games, chars, itemGames] = await Promise.all([
+      prisma.game.findMany({ select: { slug: true } }),
+      prisma.character.findMany({
+        select: { id: true, game: { select: { slug: true } } },
+      }),
+      prisma.item.findMany({
+        distinct: ['gameId'],
+        select: { game: { select: { slug: true } } },
+      }),
+    ]);
+    const itemSlugs = new Set(
+      itemGames.map((i) => i.game?.slug).filter(Boolean) as string[],
+    );
+
+    const urls: string[] = ['/', '/privacy', '/terms'];
+    for (const g of games) {
+      urls.push(
+        `/list/${g.slug}`,
+        `/calendar/${g.slug}`,
+        `/coupon/${g.slug}`,
+        `/tier-list/${g.slug}`,
+      );
+      if (itemSlugs.has(g.slug)) urls.push(`/item/${g.slug}`);
+    }
+    for (const c of chars) {
+      if (c.game?.slug) urls.push(`/content/${c.game.slug}/${c.id}`);
+    }
+
+    const body =
+      `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+      urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join('\n') +
+      `\n</urlset>\n`;
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(body);
+  } catch (e) {
+    logger.error('sitemap.xml 생성 실패:', e);
+    res.status(500).send('error');
+  }
+});
+
 app.use('/', routers);
 
 // 404 핸들러: 매칭되는 라우트가 없을 때 일관된 JSON 응답.
