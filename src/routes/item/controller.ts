@@ -5,10 +5,11 @@ import { sendOk, sendError } from '../../utils/responseBuilder';
 
 export const getList = async (req: Request, res: Response) => {
   try {
-    const { originalId, gameId } = req.query;
+    const { originalId, gameId, type } = req.query;
     const data = await service.getItemList(
       originalId as string,
       gameId ? Number(gameId) : undefined,
+      (type as string) || undefined,
     );
     sendOk(res, data);
   } catch (error) {

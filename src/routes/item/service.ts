@@ -16,11 +16,20 @@ const withOriginalId = <
     | undefined,
 });
 
-export const getItemList = async (originalId?: string, gameId?: number) => {
+export const getItemList = async (
+  originalId?: string,
+  gameId?: number,
+  type?: string,
+) => {
   const where: any = {};
 
   if (gameId) {
     where.gameId = gameId;
+  }
+
+  // 타입 필터(아이템 UI). 지정 시 해당 타입만 → MAX_LIST(1000) 잘림 방지 + 페이로드 축소.
+  if (type) {
+    where.type = type;
   }
 
   if (originalId) {
