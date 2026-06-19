@@ -35,6 +35,7 @@ import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { NteCharacterScraper } from './scrapers/nte/CharacterScraper';
 import { BlueArchiveCharacterScraper } from './scrapers/bluearchive/CharacterScraper';
+import { BlueArchiveYoutubeShortsScraper } from './scrapers/bluearchive/YoutubeShortsScraper';
 import { NteItemScraper } from './scrapers/nte/ItemScraper';
 import { NteYoutubeShortsScraper } from './scrapers/nte/YoutubeShortsScraper';
 import { NteEventScraper } from './scrapers/nte/EventScraper';
@@ -532,6 +533,17 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const scraper = new BlueArchiveCharacterScraper();
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncCharacters('bluearchive', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'bluearchive',
+    type: 'video',
+    // 공식 한국 채널(@bluearchive_kr) 캐릭터 PV(가로 16:9). character 선행 필요(제목 매칭).
+    run: async (s) => {
+      const scraper = new BlueArchiveYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('bluearchive', data);
       return data.length;
     },
   },

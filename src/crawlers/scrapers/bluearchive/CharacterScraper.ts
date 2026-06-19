@@ -45,6 +45,15 @@ interface BAStudent {
   MaxHP100?: number;
   DefensePower100?: number;
   HealPower100?: number;
+  DodgePoint?: number;
+  AccuracyPoint?: number;
+  CriticalPoint?: number;
+  StreetBattleAdaptation?: number;
+  OutdoorBattleAdaptation?: number;
+  IndoorBattleAdaptation?: number;
+  Weapon?: { Name?: string } | null;
+  Gear?: { Name?: string } | Record<string, never> | null;
+  Equipment?: string[];
   FamilyName?: string;
   PersonalName?: string;
   SchoolYear?: string;
@@ -261,12 +270,25 @@ export class BlueArchiveCharacterScraper extends ScraperBase {
             cardImageUrl: imageUrl,
             portraitUrl,
             iconUrl,
-            // 스탯(요약)
+            // 무기/고유장비
+            weaponName: s.Weapon?.Name || null,
+            gearName: (s.Gear && (s.Gear as { Name?: string }).Name) || null,
+            equipment: Array.isArray(s.Equipment) ? s.Equipment : [],
+            // 지형 적응(0~5) — 프론트가 D/C/B/A/S/SS 등급으로 표시
+            terrain: {
+              street: s.StreetBattleAdaptation ?? null,
+              outdoor: s.OutdoorBattleAdaptation ?? null,
+              indoor: s.IndoorBattleAdaptation ?? null,
+            },
+            // 기본 스탯(만렙)
             stats: {
               AttackPower: s.AttackPower100 ?? null,
               MaxHP: s.MaxHP100 ?? null,
               DefensePower: s.DefensePower100 ?? null,
               HealPower: s.HealPower100 ?? null,
+              DodgePoint: s.DodgePoint ?? null,
+              AccuracyPoint: s.AccuracyPoint ?? null,
+              CriticalPoint: s.CriticalPoint ?? null,
             },
             skills,
           },
