@@ -329,8 +329,9 @@ export class CrawlerController {
         .then(async (itemsFound) => {
           logger.info(`Manual task [${gameSlug}] ${crawlerType} completed.`);
           // 완료 로그 업데이트(데이터 공백 요약을 metadata에 기록 → 로그 상세 모달 노출).
-          await prisma.crawlerLog.update({
-            where: { id: crawlerLog.id },
+          // updateMany + status=RUNNING 가드: 사용자가 정지로 이미 종료시킨 로그는 덮지 않는다.
+          await prisma.crawlerLog.updateMany({
+            where: { id: crawlerLog.id, status: CrawlerStatus.RUNNING },
             data: {
               status: CrawlerStatus.SUCCESS,
               endTime: new Date(),
@@ -344,9 +345,9 @@ export class CrawlerController {
             `Manual task [${gameSlug}] ${crawlerType} failed:`,
             error,
           );
-          // 실패 로그 업데이트
-          await prisma.crawlerLog.update({
-            where: { id: crawlerLog.id },
+          // 실패 로그 업데이트(정지로 이미 종료된 로그는 덮지 않음).
+          await prisma.crawlerLog.updateMany({
+            where: { id: crawlerLog.id, status: CrawlerStatus.RUNNING },
             data: {
               status: CrawlerStatus.FAILED,
               endTime: new Date(),
@@ -447,13 +448,40 @@ export class CrawlerController {
         .json({ resultCode: 400, resultMsg: 'gameSlug와 crawlerType이 필요합니다.' });
       return;
     }
-    const ok = crawlProgress.requestStop(`${gameSlug}:${crawlerType}`);
+
+    // 1) 살아있는 실행이면 협조적 취소 요청(스크래퍼가 다음 반복에서 멈춤).
+    const requested = crawlProgress.requestStop(`${gameSlug}:${crawlerType}`);
+
+    // 2) 진행 중(RUNNING) 로그를 즉시 종료 처리 → UI가 바로 반영.
+    //    (죽은/잔여 RUNNING 로그도 이걸로 정리된다. status=RUNNING 가드라 완료된 로그는 안 건드림.)
+    let cleared = 0;
+    const game = await prisma.game.findUnique({
+      where: { slug: gameSlug },
+      select: { id: true },
+    });
+    if (game) {
+      const r = await prisma.crawlerLog.updateMany({
+        where: {
+          gameId: game.id,
+          crawlerType,
+          status: CrawlerStatus.RUNNING,
+        },
+        data: {
+          status: CrawlerStatus.FAILED,
+          endTime: new Date(),
+          errorMsg: '사용자 중단',
+        },
+      });
+      cleared = r.count;
+    }
+
     res.status(200).json({
       resultCode: 200,
-      resultMsg: ok
-        ? '중단을 요청했습니다. 진행 중인 항목 이후 멈춥니다.'
-        : '진행 중인 해당 크롤이 없거나 중단을 지원하지 않습니다.',
-      data: { requested: ok },
+      resultMsg:
+        requested || cleared
+          ? '크롤을 중단했습니다.'
+          : '진행 중인 해당 크롤이 없습니다.',
+      data: { requested, cleared },
     });
   };
 }
