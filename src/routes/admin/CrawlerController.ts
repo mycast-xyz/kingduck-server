@@ -5,6 +5,7 @@ import { CRAWLER_TASKS } from '../../crawlers/scheduler';
 import { DataSyncService } from '../../crawlers/services/DataSyncService';
 import { Browser } from '../../crawlers/core/Browser';
 import { ImageDownloader } from '../../crawlers/utils/ImageDownloader';
+import { crawlProgress } from '../../crawlers/crawlProgress';
 import logger from '../../utils/logger';
 
 export class CrawlerController {
@@ -316,6 +317,10 @@ export class CrawlerController {
         logger.warn(`Purge before re-crawl: ${gameSlug}/${crawlerType}`);
       }
 
+      // 진행 상황 레지스트리 등록(스크래퍼가 같은 키로 report/shouldStop).
+      const progressKey = `${gameSlug}:${crawlerType}`;
+      crawlProgress.begin(progressKey);
+
       // 백그라운드 실행. 이 태스크의 데이터 공백 요약만 기록되도록 리셋.
       syncService.lastSyncGaps = null;
       task
@@ -351,6 +356,7 @@ export class CrawlerController {
         .finally(() => {
           // 전역 강제 플래그는 다른 실행에 영향 주지 않도록 반드시 리셋.
           ImageDownloader.forceOverwrite = false;
+          crawlProgress.finish(progressKey);
         });
 
       // 5. 즉시 응답 (방금 생성한 로그 정보를 반환)
@@ -414,6 +420,40 @@ export class CrawlerController {
         resultMsg: '서버 오류가 발생했습니다.',
       });
     }
+  };
+
+  /**
+   * 실행 중 크롤의 실시간 진행 상황(인메모리). 어드민이 폴링.
+   * GET /api/v0/admin/crawler/progress
+   */
+  getProgress = async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json({
+      resultCode: 200,
+      resultMsg: '성공',
+      data: { runs: crawlProgress.getAll() },
+    });
+  };
+
+  /**
+   * 실행 중 크롤에 중단 요청(협조적 취소 — 스크래퍼가 다음 반복에서 멈춤).
+   * POST /api/v0/admin/crawler/stop  { gameSlug, crawlerType }
+   */
+  stopCrawler = async (req: Request, res: Response): Promise<void> => {
+    const { gameSlug, crawlerType } = req.body;
+    if (!gameSlug || !crawlerType) {
+      res
+        .status(400)
+        .json({ resultCode: 400, resultMsg: 'gameSlug와 crawlerType이 필요합니다.' });
+      return;
+    }
+    const ok = crawlProgress.requestStop(`${gameSlug}:${crawlerType}`);
+    res.status(200).json({
+      resultCode: 200,
+      resultMsg: ok
+        ? '중단을 요청했습니다. 진행 중인 항목 이후 멈춥니다.'
+        : '진행 중인 해당 크롤이 없거나 중단을 지원하지 않습니다.',
+      data: { requested: ok },
+    });
   };
 }
 

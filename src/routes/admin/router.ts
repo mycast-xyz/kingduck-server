@@ -369,6 +369,10 @@ router.get('/crawler/logs', CrawlerController.getLogs);
  */
 router.post('/crawler/run', CrawlerController.runCrawler);
 
+// 실행 중 크롤의 실시간 진행 + 중단 요청
+router.get('/crawler/progress', CrawlerController.getProgress);
+router.post('/crawler/stop', CrawlerController.stopCrawler);
+
 /**
  * @swagger
  * /api/v0/admin/crawler/run/{logId}:

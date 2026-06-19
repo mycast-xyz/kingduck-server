@@ -2,6 +2,10 @@ import { Browser } from '../../core/Browser';
 import { prisma } from '../../../utils/prisma';
 import logger from '../../../utils/logger';
 import { ImageDownloader } from '../../utils/ImageDownloader';
+import { crawlProgress } from '../../crawlProgress';
+
+// 진행/중단 레지스트리 키(CrawlerController의 `${game}:${type}`와 일치).
+const PROGRESS_KEY = 'nikke:detail';
 
 /**
  * 니케 캐릭터 상세 enrichment 스크래퍼 — blablalink(SHIFT UP 공식 한국어).
@@ -106,6 +110,14 @@ export class BlablalinkDetailScraper {
     const MAX_CONSEC_FAIL = 20; // 연속 20회 실패면 소스 차단/다운으로 보고 중단
 
     for (const ch of characters) {
+      // 어드민 "정지" 요청(협조적 취소) — 다음 캐릭터로 넘어가기 전에 멈춘다.
+      if (crawlProgress.shouldStop(PROGRESS_KEY)) {
+        logger.warn(`[nikke/detail] 사용자 중단 요청 — ${success} enriched 후 멈춤.`);
+        break;
+      }
+      // 실시간 진행 보고(어드민 폴링).
+      crawlProgress.report(PROGRESS_KEY, processed, characters.length, ch.name);
+
       // 연속 실패가 임계치를 넘으면(소스 차단/다운 추정) 더 갈수록 손해 → 중단.
       if (consecFail >= MAX_CONSEC_FAIL) {
         logger.error(
