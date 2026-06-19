@@ -34,6 +34,10 @@ import { YoutubeShortsScraper as NikkeYoutubeShortsScraper } from './scrapers/ni
 import { BlablalinkEventScraper } from './scrapers/nikke/EventScraper';
 import { ZzzCharacterScraper } from './scrapers/zzz/CharacterScraper';
 import { NteCharacterScraper } from './scrapers/nte/CharacterScraper';
+import { NteItemScraper } from './scrapers/nte/ItemScraper';
+import { NteYoutubeShortsScraper } from './scrapers/nte/YoutubeShortsScraper';
+import { NteEventScraper } from './scrapers/nte/EventScraper';
+import { NteRedeemCodeScraper } from './scrapers/nte/RedeemCodeScraper';
 import { ZzzItemScraper } from './scrapers/zzz/ItemScraper';
 import { ZzzBuildScraper } from './scrapers/zzz/BuildScraper';
 import { ZzzYoutubeScraper } from './scrapers/zzz/YoutubeShortsScraper';
@@ -474,6 +478,47 @@ export const CRAWLER_TASKS: ScraperTask[] = [
       const data = await scraper.scrape();
       if (data.length > 0) await s.syncCharacters('nte', data);
       return data.length;
+    },
+  },
+  {
+    game: 'nte',
+    type: 'item',
+    // 무기(Arc) + 드라이브/모듈(Shard) — everness GraphQL. ItemType.type='Arc'/'Module'.
+    run: async (s) => {
+      const scraper = new NteItemScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncItems('nte', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'nte',
+    type: 'video',
+    // 공식 한국 채널(@NTE_KO) 세로 숏츠. character 선행 필요(제목 매칭).
+    run: async (s) => {
+      const scraper = new NteYoutubeShortsScraper();
+      const data = await scraper.scrape();
+      if (data.length > 0) await s.syncVideos('nte', data);
+      return data.length;
+    },
+  },
+  {
+    game: 'nte',
+    type: 'event',
+    // everness GraphQL events → CalendarEvent.
+    run: async () => {
+      const scraper = new NteEventScraper();
+      return await scraper.scrape();
+    },
+  },
+  {
+    game: 'nte',
+    type: 'redeem',
+    // everness GraphQL promocodes → RedeemGroup/RedeemCode.
+    run: async () => {
+      const scraper = new NteRedeemCodeScraper();
+      const result = await scraper.scrape();
+      return result ? result.codes.length : 0;
     },
   },
 ];
