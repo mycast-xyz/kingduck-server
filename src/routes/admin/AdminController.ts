@@ -29,7 +29,10 @@ export class AdminController {
    */
   async getDashboardSummary(_req: Request, res: Response): Promise<void> {
     try {
-      const [games, characters, items, events, users, pendingEvents] =
+      const now = new Date();
+      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const [games, characters, items, events, users, pendingEvents, expiringRedeem] =
         await Promise.all([
           prisma.game.count(),
           prisma.character.count(),
@@ -37,9 +40,11 @@ export class AdminController {
           prisma.calendarEvent.count(),
           prisma.user.count(),
           prisma.calendarEvent.count({ where: { status: 'PENDING' } }),
+          // 7일 내 만료 임박 쿠폰 그룹
+          prisma.redeemGroup.count({ where: { endTime: { gte: now, lte: in7Days } } }),
         ]);
 
-      sendOk(res, { games, characters, items, events, users, pendingEvents });
+      sendOk(res, { games, characters, items, events, users, pendingEvents, expiringRedeem });
     } catch (error) {
       logger.error('getDashboardSummary Error:', error);
       res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
@@ -264,6 +269,9 @@ export class AdminController {
       if (active !== undefined) updateData.active = Boolean(active);
 
       const game = await prisma.game.update({ where: { slug }, data: updateData });
+
+      const changed = Object.keys(updateData).join(', ') || '없음';
+      logAdminActivity(req, 'GAME_UPDATE', 'game', game.id, `게임 '${game.name}' 수정(${changed})`);
 
       res.status(200).json({
         resultCode: 200,
