@@ -141,8 +141,10 @@ export class AdminController {
           slug: true,
           name: true,
           iconUrl: true,
+          sortOrder: true,
+          active: true,
         },
-        orderBy: { id: 'asc' },
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       });
 
       // N+1 방지(B-H5): 게임마다 count 3회 대신 groupBy 집계 3회로 일괄 조회.
@@ -163,6 +165,8 @@ export class AdminController {
         slug: game.slug,
         name: game.name,
         iconUrl: game.iconUrl,
+        sortOrder: game.sortOrder,
+        active: game.active,
         counts: {
           characters: charMap.get(game.id) ?? 0,
           items: itemMap.get(game.id) ?? 0,
@@ -245,7 +249,7 @@ export class AdminController {
         return;
       }
 
-      const { name, description } = req.body;
+      const { name, description, sortOrder, active } = req.body;
 
       // 빈 문자열은 null로 정규화(updateElement 컨벤션).
       const normStr = (v: unknown): string | null => {
@@ -256,6 +260,8 @@ export class AdminController {
       const updateData: any = {};
       if (name !== undefined) updateData.name = String(name).trim();
       if (description !== undefined) updateData.description = normStr(description);
+      if (sortOrder !== undefined) updateData.sortOrder = parseInt(String(sortOrder), 10);
+      if (active !== undefined) updateData.active = Boolean(active);
 
       const game = await prisma.game.update({ where: { slug }, data: updateData });
 

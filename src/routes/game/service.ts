@@ -2,7 +2,8 @@ import { prisma } from '../../utils/prisma';
 
 export const getGameList = async () => {
   return await prisma.game.findMany({
-    orderBy: { id: 'asc' },
+    where: { active: true },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
   });
 };
 
