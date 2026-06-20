@@ -27,6 +27,7 @@ model Game {
   calendarEvents CalendarEvent[]
   redeemGroups   RedeemGroup[]
   crawlerLogs    CrawlerLog[]
+  teamRecommendations TeamRecommendation[]
 
   @@map("games")
 }
@@ -147,6 +148,7 @@ model Character {
   element Element? @relation("CharacterElement", fields: [elementId], references: [id])
   path    Element? @relation("CharacterPath", fields: [pathId], references: [id])
   videos  Video[]
+  teamRecommendations TeamRecommendation[]
 
   @@unique([gameId, originalId]) // 외부 소스 식별자 기준 upsert/조회 인덱스 (B-H4b)
   @@index([gameId])
@@ -305,4 +307,25 @@ model Faq {
 
   @@index([category, sortOrder])
   @@map("faqs")
+}
+
+// 팀빌드 추천 — 캐릭터(앵커)에 붙는 수동 관리 팀 조합. 있으면 공개 character 상세가 metadata.teams를 이걸로 override.
+model TeamRecommendation {
+  id          Int       @id @default(autoincrement())
+  gameId      Int       @map("game_id")
+  game        Game      @relation(fields: [gameId], references: [id])
+  characterId Int       @map("character_id") // 이 추천이 붙는 메인(앵커) 캐릭터
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  name        String
+  description String?   @db.Text
+  slots       Json // [{ main: originalId, backups: [originalId...] }] — 프론트 teams 계약과 동일 shape
+  tags        Json? // 시너지 태그 등(선택)
+  sortOrder   Int       @default(0) @map("sort_order")
+  published   Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([characterId, sortOrder])
+  @@index([gameId])
+  @@map("team_recommendations")
 }

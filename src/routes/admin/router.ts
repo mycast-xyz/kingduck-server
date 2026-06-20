@@ -1056,6 +1056,182 @@ router.put('/faq/:id', AdminController.updateFaq);
  */
 router.delete('/faq/:id', AdminController.deleteFaq);
 
+// 팀빌드 추천(TeamRecommendation) CRUD — 리터럴 경로(team/list)를 :id 보다 먼저 등록.
+
+/**
+ * @swagger
+ * /api/v0/admin/team/list:
+ *   get:
+ *     summary: 팀빌드 추천 목록 조회 (페이지네이션, 검색)
+ *     tags: [Admin - Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: 페이지당 항목 수
+ *       - in: query
+ *         name: gameId
+ *         schema:
+ *           type: integer
+ *         description: 게임 ID 일치 필터
+ *       - in: query
+ *         name: characterId
+ *         schema:
+ *           type: integer
+ *         description: 앵커 캐릭터 ID 일치 필터
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: 팀 이름 검색
+ *     responses:
+ *       200:
+ *         description: 팀빌드 추천 목록 반환 성공
+ */
+router.get('/team/list', AdminController.getTeamList);
+
+/**
+ * @swagger
+ * /api/v0/admin/team:
+ *   post:
+ *     summary: 팀빌드 추천 생성 (어드민 직접 등록)
+ *     tags: [Admin - Team]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gameId, characterId, name, slots]
+ *             properties:
+ *               gameId:
+ *                 type: integer
+ *               characterId:
+ *                 type: integer
+ *                 description: 추천이 붙는 앵커 캐릭터 ID
+ *               name:
+ *                 type: string
+ *               slots:
+ *                 type: array
+ *                 description: '[{ main: originalId, backups: [originalId...] }]'
+ *                 items:
+ *                   type: object
+ *               description:
+ *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               sortOrder:
+ *                 type: integer
+ *               published:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: 팀빌드 추천 생성 성공
+ *       400:
+ *         description: 필수 항목 누락 또는 존재하지 않는 게임/캐릭터
+ */
+router.post('/team', AdminController.createTeam);
+
+/**
+ * @swagger
+ * /api/v0/admin/team/{id}:
+ *   get:
+ *     summary: 팀빌드 추천 상세 조회
+ *     tags: [Admin - Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 팀빌드 추천 상세 반환 성공
+ *       404:
+ *         description: 팀빌드 추천을 찾을 수 없음
+ */
+router.get('/team/:id', AdminController.getTeamDetail);
+
+/**
+ * @swagger
+ * /api/v0/admin/team/{id}:
+ *   put:
+ *     summary: 팀빌드 추천 수정 (어드민, gameId·characterId 불변)
+ *     tags: [Admin - Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               slots:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               description:
+ *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               sortOrder:
+ *                 type: integer
+ *               published:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: 팀빌드 추천 수정 성공
+ *       404:
+ *         description: 팀빌드 추천을 찾을 수 없음
+ */
+router.put('/team/:id', AdminController.updateTeam);
+
+/**
+ * @swagger
+ * /api/v0/admin/team/{id}:
+ *   delete:
+ *     summary: 팀빌드 추천 삭제 (어드민)
+ *     tags: [Admin - Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 팀빌드 추천 삭제 성공
+ *       404:
+ *         description: 팀빌드 추천을 찾을 수 없음
+ */
+router.delete('/team/:id', AdminController.deleteTeam);
+
 /**
  * @swagger
  * /api/v0/admin/event/list:

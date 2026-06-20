@@ -2451,6 +2451,266 @@ export class AdminController {
       res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
     }
   }
+
+  /**
+   * 팀빌드 추천 목록 조회 (페이지네이션, 검색) — getNoticeList 미러링
+   * GET /api/v0/admin/team/list
+   */
+  async getTeamList(req: Request, res: Response): Promise<void> {
+    try {
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 10);
+      const gameId = req.query.gameId
+        ? parseInt(req.query.gameId as string)
+        : undefined;
+      const characterId = req.query.characterId
+        ? parseInt(req.query.characterId as string)
+        : undefined;
+      const name = req.query.name as string;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (gameId) where.gameId = gameId;
+      if (characterId) where.characterId = characterId;
+      if (name) where.name = { contains: name, mode: 'insensitive' };
+
+      const [total, items] = await Promise.all([
+        prisma.teamRecommendation.count({ where }),
+        prisma.teamRecommendation.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: [{ sortOrder: 'asc' }, { id: 'desc' }], // 표시순서 → 최신순
+          include: {
+            game: { select: { id: true, name: true, slug: true } },
+            character: { select: { id: true, name: true, originalId: true } },
+          },
+        }),
+      ]);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '성공',
+        data: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          items,
+        },
+      });
+    } catch (error) {
+      logger.error('getTeamList Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 팀빌드 추천 상세 조회 — getNoticeDetail 미러링
+   * GET /api/v0/admin/team/:id
+   */
+  async getTeamDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const team = await prisma.teamRecommendation.findUnique({
+        where: { id },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          character: { select: { id: true, name: true, originalId: true } },
+        },
+      });
+      if (!team) {
+        res.status(404).json({ resultCode: 404, resultMsg: '팀빌드 추천을 찾을 수 없습니다.' });
+        return;
+      }
+
+      sendOk(res, team);
+    } catch (error) {
+      logger.error('getTeamDetail Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 팀빌드 추천 생성 (어드민 직접 등록) — createNotice 미러링
+   * POST /api/v0/admin/team
+   */
+  async createTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const { gameId, characterId, name, slots, description, tags, sortOrder, published } = req.body;
+
+      if (!gameId || !characterId || !name || !Array.isArray(slots)) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(gameId, characterId, name, slots[array])을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const data: any = {
+        gameId: parseInt(String(gameId)),
+        characterId: parseInt(String(characterId)),
+        name: String(name),
+        slots,
+        description: normStr(description),
+      };
+      // tags(Json)는 보내면 그대로 저장, 누락이면 스키마 nullable.
+      if (tags !== undefined && tags !== null) data.tags = tags;
+      // sortOrder/published는 보내면 반영, 누락이면 스키마 기본(0 / true).
+      if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '') {
+        data.sortOrder = parseInt(String(sortOrder)) || 0;
+      }
+      if (published !== undefined) data.published = Boolean(published);
+
+      const team = await prisma.teamRecommendation.create({
+        data,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          character: { select: { id: true, name: true, originalId: true } },
+        },
+      });
+
+      logAdminActivity(
+        req,
+        'TEAM_CREATE',
+        'team',
+        team.id,
+        `팀빌드 추천 '${team.name}' 생성(${team.game.slug} / ${team.character.name})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '팀빌드 추천이 생성되었습니다.',
+        data: team,
+      });
+    } catch (error) {
+      // gameId/characterId FK 위반
+      if ((error as { code?: string }).code === 'P2003') {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '존재하지 않는 게임 또는 캐릭터입니다.',
+        });
+        return;
+      }
+      logger.error('createTeam Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 팀빌드 추천 수정 (어드민, !==undefined 필드만 머지) — updateNotice 미러링
+   * gameId·characterId(앵커)는 불변 — 변경하려면 삭제 후 재생성.
+   * PUT /api/v0/admin/team/:id
+   */
+  async updateTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.teamRecommendation.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '팀빌드 추천을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { name, slots, description, tags, sortOrder, published } = req.body;
+
+      if (slots !== undefined && !Array.isArray(slots)) {
+        res.status(400).json({ resultCode: 400, resultMsg: 'slots는 배열이어야 합니다.' });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = String(name);
+      if (slots !== undefined) updateData.slots = slots;
+      if (description !== undefined) updateData.description = normStr(description);
+      if (tags !== undefined) updateData.tags = tags; // null 보내면 태그 제거
+      if (sortOrder !== undefined) {
+        updateData.sortOrder = sortOrder === null || sortOrder === '' ? 0 : parseInt(String(sortOrder)) || 0;
+      }
+      if (published !== undefined) updateData.published = Boolean(published);
+
+      const team = await prisma.teamRecommendation.update({
+        where: { id },
+        data: updateData,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          character: { select: { id: true, name: true, originalId: true } },
+        },
+      });
+
+      logAdminActivity(
+        req,
+        'TEAM_UPDATE',
+        'team',
+        team.id,
+        `팀빌드 추천 '${team.name}' 수정(${team.game.slug} / ${team.character.name})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '팀빌드 추천이 수정되었습니다.',
+        data: team,
+      });
+    } catch (error) {
+      logger.error('updateTeam Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 팀빌드 추천 삭제 (어드민) — deleteNotice 미러링
+   * DELETE /api/v0/admin/team/:id
+   */
+  async deleteTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.teamRecommendation.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '팀빌드 추천을 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.teamRecommendation.delete({ where: { id } });
+
+      logAdminActivity(req, 'TEAM_DELETE', 'team', id, `팀빌드 추천 '${existing.name}' 삭제`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '팀빌드 추천이 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteTeam Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
 }
 
 export default new AdminController();

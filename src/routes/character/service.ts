@@ -17,6 +17,35 @@ const withOriginalId = <T extends { originalId?: string | null; metadata?: unkno
   originalId: (c.originalId ?? (c.metadata as any)?.originalId) as string | undefined,
 });
 
+// 팀빌드 추천 override: 어드민이 등록한 published TeamRecommendation이 1건 이상이면
+// 크롤 데이터(metadata.teams)를 그 목록으로 교체한다. 0건이면 기존 metadata.teams 그대로 유지.
+// 앵커 캐릭터 id로 조회, sortOrder asc. metadata가 null/비객체면 빈 객체로 안전 처리.
+const applyTeamOverride = async <T extends { id: number; metadata?: unknown }>(
+  character: T,
+): Promise<T> => {
+  const records = await prisma.teamRecommendation.findMany({
+    where: { characterId: character.id, published: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+  if (records.length === 0) return character;
+
+  const base =
+    character.metadata && typeof character.metadata === 'object'
+      ? (character.metadata as Record<string, unknown>)
+      : {};
+  return {
+    ...character,
+    metadata: {
+      ...base,
+      teams: records.map((t) => ({
+        name: t.name,
+        slots: t.slots,
+        ...(t.tags ? { tags: t.tags } : {}),
+      })),
+    },
+  } as T;
+};
+
 export const getCharacterList = async (
   gameSlug: string,
   filter?: CharacterFilter,
@@ -105,7 +134,7 @@ export const getCharacter = async (gameSlug: string, id: number) => {
       videos: true,
     },
   });
-  return result ? withOriginalId(result) : result;
+  return result ? applyTeamOverride(withOriginalId(result)) : result;
 };
 
 export const getCharacterByOriginalId = async (
@@ -145,7 +174,7 @@ export const getCharacterAdmin = async (id: number) => {
       videos: true,
     },
   });
-  return result ? withOriginalId(result) : result;
+  return result ? applyTeamOverride(withOriginalId(result)) : result;
 };
 
 export const getCharacterByName = async (gameSlug: string, name: string) => {
