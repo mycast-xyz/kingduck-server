@@ -751,6 +751,291 @@ router.post('/redeem/group/:id/code', AdminController.addRedeemCode);
  */
 router.delete('/redeem/code/:codeId', AdminController.deleteRedeemCode);
 
+// 공지(Notice) CRUD — 리터럴 경로(notice/list)를 :id 보다 먼저 등록.
+
+/**
+ * @swagger
+ * /api/v0/admin/notice/list:
+ *   get:
+ *     summary: 공지 목록 조회 (페이지네이션, 검색)
+ *     tags: [Admin - Notice]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: 페이지당 항목 수
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: 카테고리 일치 필터
+ *       - in: query
+ *         name: title
+ *         schema:
+ *           type: string
+ *         description: 제목 검색
+ *     responses:
+ *       200:
+ *         description: 공지 목록 반환 성공
+ */
+router.get('/notice/list', AdminController.getNoticeList);
+
+/**
+ * @swagger
+ * /api/v0/admin/notice:
+ *   post:
+ *     summary: 공지 생성 (어드민 직접 등록)
+ *     tags: [Admin - Notice]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, content]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               pinned:
+ *                 type: boolean
+ *               published:
+ *                 type: boolean
+ *               startAt:
+ *                 type: string
+ *                 format: date-time
+ *               endAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: 공지 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ */
+router.post('/notice', AdminController.createNotice);
+
+/**
+ * @swagger
+ * /api/v0/admin/notice/{id}:
+ *   get:
+ *     summary: 공지 상세 조회
+ *     tags: [Admin - Notice]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 공지 상세 반환 성공
+ *       404:
+ *         description: 공지를 찾을 수 없음
+ */
+router.get('/notice/:id', AdminController.getNoticeDetail);
+
+/**
+ * @swagger
+ * /api/v0/admin/notice/{id}:
+ *   put:
+ *     summary: 공지 수정 (어드민)
+ *     tags: [Admin - Notice]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: 공지 수정 성공
+ *       404:
+ *         description: 공지를 찾을 수 없음
+ */
+router.put('/notice/:id', AdminController.updateNotice);
+
+/**
+ * @swagger
+ * /api/v0/admin/notice/{id}:
+ *   delete:
+ *     summary: 공지 삭제 (어드민)
+ *     tags: [Admin - Notice]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 공지 삭제 성공
+ *       404:
+ *         description: 공지를 찾을 수 없음
+ */
+router.delete('/notice/:id', AdminController.deleteNotice);
+
+// FAQ CRUD — 리터럴 경로(faq/list)를 :id 보다 먼저 등록.
+
+/**
+ * @swagger
+ * /api/v0/admin/faq/list:
+ *   get:
+ *     summary: FAQ 목록 조회 (페이지네이션, 검색)
+ *     tags: [Admin - FAQ]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: 페이지당 항목 수
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: 카테고리 일치 필터
+ *     responses:
+ *       200:
+ *         description: FAQ 목록 반환 성공
+ */
+router.get('/faq/list', AdminController.getFaqList);
+
+/**
+ * @swagger
+ * /api/v0/admin/faq:
+ *   post:
+ *     summary: FAQ 생성 (어드민 직접 등록)
+ *     tags: [Admin - FAQ]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [question, answer]
+ *             properties:
+ *               question:
+ *                 type: string
+ *               answer:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               sortOrder:
+ *                 type: integer
+ *               published:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: FAQ 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ */
+router.post('/faq', AdminController.createFaq);
+
+/**
+ * @swagger
+ * /api/v0/admin/faq/{id}:
+ *   get:
+ *     summary: FAQ 상세 조회
+ *     tags: [Admin - FAQ]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: FAQ 상세 반환 성공
+ *       404:
+ *         description: FAQ를 찾을 수 없음
+ */
+router.get('/faq/:id', AdminController.getFaqDetail);
+
+/**
+ * @swagger
+ * /api/v0/admin/faq/{id}:
+ *   put:
+ *     summary: FAQ 수정 (어드민)
+ *     tags: [Admin - FAQ]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: FAQ 수정 성공
+ *       404:
+ *         description: FAQ를 찾을 수 없음
+ */
+router.put('/faq/:id', AdminController.updateFaq);
+
+/**
+ * @swagger
+ * /api/v0/admin/faq/{id}:
+ *   delete:
+ *     summary: FAQ 삭제 (어드민)
+ *     tags: [Admin - FAQ]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: FAQ 삭제 성공
+ *       404:
+ *         description: FAQ를 찾을 수 없음
+ */
+router.delete('/faq/:id', AdminController.deleteFaq);
+
 /**
  * @swagger
  * /api/v0/admin/event/list:

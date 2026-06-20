@@ -271,3 +271,36 @@ model RedeemCode {
 
   @@map("redeem_codes")
 }
+
+// 공지사항 — 전역(게임 비종속). 사용자 대면 안내.
+model Notice {
+  id        Int       @id @default(autoincrement())
+  title     String
+  content   String    @db.Text
+  category  String? // 자유 문자열(예: 점검/업데이트/일반). enum 대신(기존 컨벤션).
+  pinned    Boolean   @default(false) // 상단 고정
+  published Boolean   @default(true) // 공개 여부(초안/숨김 토글)
+  startAt   DateTime? @map("start_at") // 게시 시작(nullable=즉시)
+  endAt     DateTime? @map("end_at") // 게시 종료(nullable=무기한)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([pinned, createdAt])
+  @@index([published])
+  @@map("notices")
+}
+
+// FAQ — 전역. 카테고리별 그룹핑 + 표시 순서.
+model Faq {
+  id        Int      @id @default(autoincrement())
+  category  String? // 카테고리 그룹핑
+  question  String
+  answer    String   @db.Text
+  sortOrder Int      @default(0) @map("sort_order") // 'order'는 PG 예약어라 sortOrder
+  published Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category, sortOrder])
+  @@map("faqs")
+}

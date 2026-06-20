@@ -1977,6 +1977,408 @@ export class AdminController {
       res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
     }
   }
+
+  /**
+   * 공지(Notice) 목록 조회 (페이지네이션, 검색) — getItemList 미러링
+   * GET /api/v0/admin/notice/list
+   */
+  async getNoticeList(req: Request, res: Response): Promise<void> {
+    try {
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 10);
+      const category = req.query.category as string;
+      const title = req.query.title as string;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (category) where.category = category;
+      if (title) where.title = { contains: title, mode: 'insensitive' };
+
+      const [total, items] = await Promise.all([
+        prisma.notice.count({ where }),
+        prisma.notice.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }], // 고정 먼저, 최신순
+        }),
+      ]);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '성공',
+        data: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          items,
+        },
+      });
+    } catch (error) {
+      logger.error('getNoticeList Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 공지 상세 조회 — getItemDetail 미러링
+   * GET /api/v0/admin/notice/:id
+   */
+  async getNoticeDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const notice = await prisma.notice.findUnique({ where: { id } });
+      if (!notice) {
+        res.status(404).json({ resultCode: 404, resultMsg: '공지를 찾을 수 없습니다.' });
+        return;
+      }
+
+      sendOk(res, notice);
+    } catch (error) {
+      logger.error('getNoticeDetail Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 공지 생성 (어드민 직접 등록) — createItem 미러링
+   * POST /api/v0/admin/notice
+   */
+  async createNotice(req: Request, res: Response): Promise<void> {
+    try {
+      const { title, content, category, pinned, published, startAt, endAt } = req.body;
+
+      if (!title || !content) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(title, content)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const data: any = {
+        title: String(title),
+        content: String(content),
+        category: normStr(category),
+      };
+      // pinned/published는 보내면 반영, 누락이면 스키마 기본(false / true).
+      if (pinned !== undefined) data.pinned = Boolean(pinned);
+      if (published !== undefined) data.published = Boolean(published);
+      // startAt/endAt은 받으면 new Date() 변환, 빈/누락이면 null(스키마 nullable).
+      if (startAt !== undefined && startAt !== null && String(startAt).trim() !== '') {
+        data.startAt = new Date(startAt);
+      }
+      if (endAt !== undefined && endAt !== null && String(endAt).trim() !== '') {
+        data.endAt = new Date(endAt);
+      }
+
+      const notice = await prisma.notice.create({ data });
+
+      logAdminActivity(req, 'NOTICE_CREATE', 'notice', notice.id, `공지 '${notice.title}' 생성`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '공지가 생성되었습니다.',
+        data: notice,
+      });
+    } catch (error) {
+      logger.error('createNotice Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 공지 수정 (어드민, !==undefined 필드만 머지) — updateItem 미러링
+   * PUT /api/v0/admin/notice/:id
+   */
+  async updateNotice(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.notice.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '공지를 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { title, content, category, pinned, published, startAt, endAt } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = String(title);
+      if (content !== undefined) updateData.content = String(content);
+      if (category !== undefined) updateData.category = normStr(category);
+      if (pinned !== undefined) updateData.pinned = Boolean(pinned);
+      if (published !== undefined) updateData.published = Boolean(published);
+      if (startAt !== undefined) updateData.startAt = startAt ? new Date(startAt) : null;
+      if (endAt !== undefined) updateData.endAt = endAt ? new Date(endAt) : null;
+
+      const notice = await prisma.notice.update({ where: { id }, data: updateData });
+
+      logAdminActivity(req, 'NOTICE_UPDATE', 'notice', notice.id, `공지 '${notice.title}' 수정`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '공지가 수정되었습니다.',
+        data: notice,
+      });
+    } catch (error) {
+      logger.error('updateNotice Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 공지 삭제 (어드민) — deleteItem 미러링
+   * DELETE /api/v0/admin/notice/:id
+   */
+  async deleteNotice(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.notice.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '공지를 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.notice.delete({ where: { id } });
+
+      logAdminActivity(req, 'NOTICE_DELETE', 'notice', id, `공지 '${existing.title}' 삭제`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '공지가 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteNotice Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * FAQ 목록 조회 (페이지네이션, 검색) — getNoticeList 미러링
+   * GET /api/v0/admin/faq/list
+   */
+  async getFaqList(req: Request, res: Response): Promise<void> {
+    try {
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 10);
+      const category = req.query.category as string;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (category) where.category = category;
+
+      const [total, items] = await Promise.all([
+        prisma.faq.count({ where }),
+        prisma.faq.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }], // 카테고리→표시순서
+        }),
+      ]);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '성공',
+        data: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          items,
+        },
+      });
+    } catch (error) {
+      logger.error('getFaqList Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * FAQ 상세 조회 — getNoticeDetail 미러링
+   * GET /api/v0/admin/faq/:id
+   */
+  async getFaqDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const faq = await prisma.faq.findUnique({ where: { id } });
+      if (!faq) {
+        res.status(404).json({ resultCode: 404, resultMsg: 'FAQ를 찾을 수 없습니다.' });
+        return;
+      }
+
+      sendOk(res, faq);
+    } catch (error) {
+      logger.error('getFaqDetail Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * FAQ 생성 (어드민 직접 등록) — createNotice 미러링
+   * POST /api/v0/admin/faq
+   */
+  async createFaq(req: Request, res: Response): Promise<void> {
+    try {
+      const { question, answer, category, sortOrder, published } = req.body;
+
+      if (!question || !answer) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(question, answer)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const data: any = {
+        question: String(question),
+        answer: String(answer),
+        category: normStr(category),
+      };
+      if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '') {
+        data.sortOrder = parseInt(String(sortOrder)) || 0;
+      }
+      if (published !== undefined) data.published = Boolean(published);
+
+      const faq = await prisma.faq.create({ data });
+
+      logAdminActivity(req, 'FAQ_CREATE', 'faq', faq.id, `FAQ '${faq.question}' 생성`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: 'FAQ가 생성되었습니다.',
+        data: faq,
+      });
+    } catch (error) {
+      logger.error('createFaq Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * FAQ 수정 (어드민, !==undefined 필드만 머지) — updateNotice 미러링
+   * PUT /api/v0/admin/faq/:id
+   */
+  async updateFaq(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.faq.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: 'FAQ를 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { question, answer, category, sortOrder, published } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const updateData: any = {};
+      if (question !== undefined) updateData.question = String(question);
+      if (answer !== undefined) updateData.answer = String(answer);
+      if (category !== undefined) updateData.category = normStr(category);
+      if (sortOrder !== undefined) {
+        updateData.sortOrder = sortOrder === null || sortOrder === '' ? 0 : parseInt(String(sortOrder)) || 0;
+      }
+      if (published !== undefined) updateData.published = Boolean(published);
+
+      const faq = await prisma.faq.update({ where: { id }, data: updateData });
+
+      logAdminActivity(req, 'FAQ_UPDATE', 'faq', faq.id, `FAQ '${faq.question}' 수정`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: 'FAQ가 수정되었습니다.',
+        data: faq,
+      });
+    } catch (error) {
+      logger.error('updateFaq Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * FAQ 삭제 (어드민) — deleteNotice 미러링
+   * DELETE /api/v0/admin/faq/:id
+   */
+  async deleteFaq(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.faq.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: 'FAQ를 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.faq.delete({ where: { id } });
+
+      logAdminActivity(req, 'FAQ_DELETE', 'faq', id, `FAQ '${existing.question}' 삭제`);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: 'FAQ가 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteFaq Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
 }
 
 export default new AdminController();

@@ -9,6 +9,8 @@ import video from './video/router';
 import redeem from './redeem/router';
 import event from './event/router';
 import skill from './skill/router';
+import notice from './notice/router';
+import faq from './faq/router';
 import { cacheRead } from '../utils/responseCache';
 
 const routes = Router();
@@ -28,5 +30,7 @@ routes.use('/api/v0/video/', cacheRead(READ_TTL), video);
 routes.use('/api/v0/redeem/', cacheRead(READ_TTL), redeem);
 routes.use('/api/v0/event/', cacheRead(READ_TTL), event);
 routes.use('/api/v0/skill/', cacheRead(READ_TTL), skill);
+routes.use('/api/v0/notice/', cacheRead(READ_TTL), notice);
+routes.use('/api/v0/faq/', cacheRead(READ_TTL), faq);
 
 export default routes;
