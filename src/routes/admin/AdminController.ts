@@ -63,6 +63,72 @@ export class AdminController {
       res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
     }
   }
+
+  /**
+   * 전역 검색 집계 — 어드민 상단 검색바용. 6개 엔티티를 한 번에 contains(insensitive) 검색.
+   * q 2자 미만이면 빈 그룹으로 즉시 반환(짧은 질의로 전체 스캔 유발 방지).
+   * GET /api/v0/admin/search?q=
+   */
+  async search(req: Request, res: Response): Promise<void> {
+    try {
+      const q = String(req.query.q ?? '').trim();
+
+      const empty = {
+        characters: [],
+        items: [],
+        events: [],
+        redeemGroups: [],
+        notices: [],
+        faqs: [],
+      };
+      if (q.length < 2) {
+        sendOk(res, empty);
+        return;
+      }
+
+      const ci = { contains: q, mode: 'insensitive' as const };
+
+      const [characters, items, events, redeemGroups, notices, faqs] =
+        await Promise.all([
+          prisma.character.findMany({
+            where: { name: ci },
+            take: 5,
+            select: { id: true, name: true, gameId: true },
+          }),
+          prisma.item.findMany({
+            where: { name: ci },
+            take: 5,
+            select: { id: true, name: true, gameId: true, type: true },
+          }),
+          prisma.calendarEvent.findMany({
+            where: { title: ci },
+            take: 5,
+            select: { id: true, title: true, gameId: true },
+          }),
+          prisma.redeemGroup.findMany({
+            where: { title: ci },
+            take: 5,
+            select: { id: true, title: true, gameId: true },
+          }),
+          prisma.notice.findMany({
+            where: { title: ci },
+            take: 5,
+            select: { id: true, title: true },
+          }),
+          prisma.faq.findMany({
+            where: { question: ci },
+            take: 5,
+            select: { id: true, question: true },
+          }),
+        ]);
+
+      sendOk(res, { characters, items, events, redeemGroups, notices, faqs });
+    } catch (error) {
+      logger.error('search Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
   /**
    * 게임 목록 및 통계 조회
    * GET /api/v0/admin/game/list

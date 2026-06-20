@@ -59,6 +59,26 @@ router.get('/audit-log', AdminController.getAuditLog);
 
 /**
  * @swagger
+ * /api/v0/admin/search:
+ *   get:
+ *     summary: 전역 검색 집계 (캐릭터/아이템/이벤트/리딤그룹/공지/FAQ, 그룹별 5개)
+ *     tags: [Admin - Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: 검색어 (2자 미만이면 모든 그룹 빈 배열 반환)
+ *     responses:
+ *       200:
+ *         description: 그룹별 검색 결과 반환 성공
+ */
+router.get('/search', AdminController.search);
+
+/**
+ * @swagger
  * /api/v0/admin/game/list:
  *   get:
  *     summary: 게임 목록 및 통계 조회
