@@ -329,3 +329,13 @@ model TeamRecommendation {
   @@index([gameId])
   @@map("team_recommendations")
 }
+
+// 사이트 설정 — key-value(JSON). 어드민이 관리하고 공개 read로 노출.
+// 사용 키: homeHeroBackground(String: 'random'|'bg_01'..'bg_05'|커스텀 asset 경로), homeRecentGamesLimit(Number).
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}

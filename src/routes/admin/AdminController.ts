@@ -7,6 +7,7 @@ import UserActivityService from '../../services/UserActivityService';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
+import * as settingService from '../setting/service';
 
 // 어드민 변경 작업 감사 로그 — 비차단(실패해도 메인 응답에 영향 없음, logActivity 내부 try/catch).
 // userId는 JWT(req.user)에서. details는 { entity, entityId, summary } 계약.
@@ -2717,6 +2718,74 @@ export class AdminController {
     } catch (error) {
       logger.error('deleteTeam Error:', error);
       res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 사이트 설정 조회 (어드민) — 공개와 동일 셰이프 + 기본값 머지.
+   * GET /api/v0/admin/setting
+   */
+  async getSetting(_req: Request, res: Response): Promise<void> {
+    try {
+      const settings = await settingService.getSettings();
+      sendOk(res, settings);
+    } catch (error) {
+      logger.error('getSetting Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 사이트 설정 수정 (어드민) — 제공된 키만 upsert. homeRecentGamesLimit는 정수·1~50 클램프.
+   * PUT /api/v0/admin/setting
+   */
+  async updateSetting(req: Request, res: Response): Promise<void> {
+    try {
+      const { homeHeroBackground, homeRecentGamesLimit } = req.body ?? {};
+      const settings = await settingService.updateSettings({
+        homeHeroBackground,
+        homeRecentGamesLimit,
+      });
+
+      const changed = Object.keys(req.body ?? {}).join(', ') || '없음';
+      logAdminActivity(req, 'SETTING_UPDATE', 'setting', 0, `사이트 설정 수정(${changed})`);
+
+      sendOk(res, settings);
+    } catch (error) {
+      logger.error('updateSetting Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 홈 히어로 배경 이미지 업로드 — sharp→webp(품질 90)→static/image/site 저장.
+   * 프론트가 반환된 imageUrl을 homeHeroBackground로 PUT한다.
+   * POST /api/v0/admin/setting/hero-image  (multipart/form-data, field: file)
+   */
+  async uploadHeroImage(req: Request, res: Response): Promise<void> {
+    try {
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+
+      // static/image/site/hero-{ts}.webp (express '/assets' → 'static'). ts로 파일명 → 캐시 무효화.
+      const dir = path.join(process.cwd(), 'static', 'image', 'site');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const ts = Date.now();
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `hero-${ts}.webp`));
+
+      const imageUrl = `assets/image/site/hero-${ts}.webp?v=${ts}`;
+      logger.info(`Hero background uploaded: ${imageUrl}`);
+      sendOk(res, { imageUrl });
+    } catch (error) {
+      logger.error('uploadHeroImage Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '이미지 업로드에 실패했습니다.' });
     }
   }
 }

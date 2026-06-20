@@ -11,6 +11,7 @@ import event from './event/router';
 import skill from './skill/router';
 import notice from './notice/router';
 import faq from './faq/router';
+import setting from './setting/router';
 import { cacheRead } from '../utils/responseCache';
 
 const routes = Router();
@@ -32,5 +33,6 @@ routes.use('/api/v0/event/', cacheRead(READ_TTL), event);
 routes.use('/api/v0/skill/', cacheRead(READ_TTL), skill);
 routes.use('/api/v0/notice/', cacheRead(READ_TTL), notice);
 routes.use('/api/v0/faq/', cacheRead(READ_TTL), faq);
+routes.use('/api/v0/setting/', cacheRead(READ_TTL), setting);
 
 export default routes;

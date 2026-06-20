@@ -1779,4 +1779,65 @@ router.patch('/user/:userId/status', UserManagementController.updateUserStatus);
  */
 router.get('/user/:userId/logs', UserManagementController.getUserLogs);
 
+// 사이트 설정(key-value) — 홈 히어로 배경 / 최근 게임 노출 수 등.
+
+/**
+ * @swagger
+ * /api/v0/admin/setting:
+ *   get:
+ *     summary: 사이트 설정 조회 (어드민, 기본값 머지)
+ *     tags: [Admin - Setting]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 사이트 설정 반환 성공
+ */
+router.get('/setting', AdminController.getSetting);
+
+/**
+ * @swagger
+ * /api/v0/admin/setting:
+ *   put:
+ *     summary: 사이트 설정 수정 (제공된 키만 upsert)
+ *     tags: [Admin - Setting]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               homeHeroBackground:
+ *                 type: string
+ *                 description: "'random' | 'bg_01'..'bg_05' | 커스텀 asset 경로"
+ *               homeRecentGamesLimit:
+ *                 type: integer
+ *                 description: 1~50 클램프
+ *     responses:
+ *       200:
+ *         description: 사이트 설정 수정 성공 (갱신된 설정 반환)
+ */
+router.put('/setting', AdminController.updateSetting);
+
+/**
+ * @swagger
+ * /api/v0/admin/setting/hero-image:
+ *   post:
+ *     summary: 홈 히어로 배경 이미지 업로드 (webp 변환)
+ *     tags: [Admin - Setting]
+ *     security:
+ *       - bearerAuth: []
+ *     consumes: [multipart/form-data]
+ *     responses:
+ *       200:
+ *         description: 업로드 성공 (imageUrl 반환)
+ */
+router.post(
+  '/setting/hero-image',
+  iconUpload.single('file'),
+  AdminController.uploadHeroImage,
+);
+
 export default router;
