@@ -136,6 +136,11 @@ router.get('/data-gaps', AdminController.getDataGaps);
  *           type: integer
  *         description: 게임 ID
  *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: 아이템 타입 (free string, 예 Weapon/Material)
+ *       - in: query
  *         name: name
  *         schema:
  *           type: string
@@ -145,6 +150,148 @@ router.get('/data-gaps', AdminController.getDataGaps);
  *         description: 아이템 목록 반환 성공
  */
 router.get('/item/list', AdminController.getItemList);
+
+/**
+ * @swagger
+ * /api/v0/admin/item/{id}:
+ *   get:
+ *     summary: 아이템 상세 조회
+ *     tags: [Admin - Item CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 아이템 상세 반환 성공
+ *       404:
+ *         description: 아이템을 찾을 수 없음
+ */
+router.get('/item/:id', AdminController.getItemDetail);
+
+/**
+ * @swagger
+ * /api/v0/admin/item:
+ *   post:
+ *     summary: 아이템 생성 (어드민 직접 등록)
+ *     tags: [Admin - Item CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gameId, name, type]
+ *             properties:
+ *               gameId:
+ *                 type: integer
+ *               name:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               rarity:
+ *                 type: integer
+ *               originalId:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               imageUrl:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: 아이템 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       409:
+ *         description: 동일 gameId + type + originalId 아이템이 이미 존재
+ */
+router.post('/item', AdminController.createItem);
+
+/**
+ * @swagger
+ * /api/v0/admin/item/{id}:
+ *   put:
+ *     summary: 아이템 수정 (어드민)
+ *     tags: [Admin - Item CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: 아이템 수정 성공
+ *       404:
+ *         description: 아이템을 찾을 수 없음
+ *       409:
+ *         description: 동일 gameId + type + originalId 아이템이 이미 존재
+ */
+router.put('/item/:id', AdminController.updateItem);
+
+/**
+ * @swagger
+ * /api/v0/admin/item/{id}:
+ *   delete:
+ *     summary: 아이템 삭제 (어드민)
+ *     tags: [Admin - Item CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 아이템 삭제 성공
+ *       404:
+ *         description: 아이템을 찾을 수 없음
+ */
+router.delete('/item/:id', AdminController.deleteItem);
+
+/**
+ * @swagger
+ * /api/v0/admin/item/{id}/image:
+ *   post:
+ *     summary: 아이템 이미지 업로드/교체
+ *     tags: [Admin - Item CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     consumes: [multipart/form-data]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 업로드 성공(갱신된 imageUrl 반환)
+ *       404:
+ *         description: 아이템을 찾을 수 없음
+ */
+router.post(
+  '/item/:id/image',
+  iconUpload.single('file'),
+  AdminController.uploadItemImage,
+);
 
 /**
  * @swagger

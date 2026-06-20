@@ -422,12 +422,14 @@ export class AdminController {
       const gameId = req.query.gameId
         ? parseInt(req.query.gameId as string)
         : undefined;
+      const type = req.query.type as string;
       const name = req.query.name as string;
 
       const skip = (page - 1) * limit;
 
       const where: any = {};
       if (gameId) where.gameId = gameId;
+      if (type) where.type = type;
       if (name) where.name = { contains: name, mode: 'insensitive' };
 
       const [total, items] = await Promise.all([
@@ -460,6 +462,236 @@ export class AdminController {
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
       });
+    }
+  }
+
+  /**
+   * 아이템 상세 조회
+   * GET /api/v0/admin/item/:id
+   */
+  async getItemDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const item = await prisma.item.findUnique({
+        where: { id },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      if (!item) {
+        res.status(404).json({ resultCode: 404, resultMsg: '아이템을 찾을 수 없습니다.' });
+        return;
+      }
+
+      sendOk(res, item);
+    } catch (error) {
+      logger.error('getItemDetail Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 아이템 생성 (어드민 직접 등록)
+   * POST /api/v0/admin/item
+   */
+  async createItem(req: Request, res: Response): Promise<void> {
+    try {
+      const { gameId, name, type, rarity, originalId, description, imageUrl, metadata } = req.body;
+
+      if (!gameId || !name || !type) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(gameId, name, type)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션) — originalId가 ''이면 unique 충돌 회피.
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const item = await prisma.item.create({
+        data: {
+          gameId: parseInt(String(gameId)),
+          name: String(name),
+          type: String(type),
+          rarity: rarity !== undefined && rarity !== null && rarity !== '' ? parseInt(String(rarity)) : null,
+          originalId: normStr(originalId),
+          description: normStr(description),
+          imageUrl: normStr(imageUrl),
+          metadata: metadata ?? undefined,
+        },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '아이템이 생성되었습니다.',
+        data: item,
+      });
+    } catch (error) {
+      // @@unique([gameId, type, originalId]) 위반 (B-H4b)
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 gameId + type + originalId 아이템이 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('createItem Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 아이템 수정 (어드민)
+   * PUT /api/v0/admin/item/:id
+   */
+  async updateItem(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.item.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '아이템을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { gameId, name, type, rarity, originalId, description, imageUrl, metadata } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const updateData: any = {};
+      if (gameId !== undefined) updateData.gameId = parseInt(String(gameId));
+      if (name !== undefined) updateData.name = String(name);
+      if (type !== undefined) updateData.type = String(type);
+      if (rarity !== undefined) {
+        updateData.rarity = rarity === null || rarity === '' ? null : parseInt(String(rarity));
+      }
+      if (originalId !== undefined) updateData.originalId = normStr(originalId);
+      if (description !== undefined) updateData.description = normStr(description);
+      if (imageUrl !== undefined) updateData.imageUrl = normStr(imageUrl);
+      if (metadata !== undefined) updateData.metadata = metadata;
+
+      const item = await prisma.item.update({
+        where: { id },
+        data: updateData,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '아이템이 수정되었습니다.',
+        data: item,
+      });
+    } catch (error) {
+      // @@unique([gameId, type, originalId]) 위반 (B-H4b)
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 gameId + type + originalId 아이템이 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('updateItem Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 아이템 삭제 (어드민)
+   * DELETE /api/v0/admin/item/:id
+   */
+  async deleteItem(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.item.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '아이템을 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.item.delete({ where: { id } });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '아이템이 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteItem Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 아이템 이미지 업로드/교체 — uploadElementIcon과 동형(sharp→webp→static→imageUrl).
+   * POST /api/v0/admin/item/:id/image  (multipart/form-data, field: file)
+   */
+  async uploadItemImage(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+
+      const item = await prisma.item.findUnique({
+        where: { id },
+        include: { game: true },
+      });
+      if (!item) {
+        res.status(404).json({ resultCode: 404, resultMsg: '아이템을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const slug = item.game.slug;
+      // static/image/{slug}/item/{id}.webp (express '/assets' → 'static'). id로 파일명 → 이름 특수문자 회피.
+      const dir = path.join(process.cwd(), 'static', 'image', slug, 'item');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `${id}.webp`));
+
+      const imageUrl = `assets/image/${slug}/item/${id}.webp?v=${Date.now()}`;
+      await prisma.item.update({ where: { id }, data: { imageUrl } });
+      logger.info(`Item image updated: ${slug}/${item.type}/${item.name} (#${id}) → ${imageUrl}`);
+      sendOk(res, { id, imageUrl });
+    } catch (error) {
+      logger.error('uploadItemImage Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '아이콘 업로드에 실패했습니다.' });
     }
   }
 
