@@ -524,6 +524,233 @@ router.post(
   AdminController.uploadItemImage,
 );
 
+// 리딤(쿠폰) 그룹/코드 CRUD — 리터럴 경로(group/list)를 :id 보다 먼저 등록.
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group/list:
+ *   get:
+ *     summary: 리딤 그룹 목록 조회 (페이지네이션, 검색)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: 페이지당 항목 수
+ *       - in: query
+ *         name: gameId
+ *         schema:
+ *           type: integer
+ *         description: 게임 ID
+ *       - in: query
+ *         name: title
+ *         schema:
+ *           type: string
+ *         description: 그룹 제목 검색
+ *     responses:
+ *       200:
+ *         description: 리딤 그룹 목록 반환 성공
+ */
+router.get('/redeem/group/list', AdminController.getRedeemGroupList);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group:
+ *   post:
+ *     summary: 리딤 그룹 생성 (코드 동봉 가능)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gameId, title]
+ *             properties:
+ *               gameId:
+ *                 type: integer
+ *               title:
+ *                 type: string
+ *               periodText:
+ *                 type: string
+ *               startTime:
+ *                 type: string
+ *                 format: date-time
+ *               endTime:
+ *                 type: string
+ *                 format: date-time
+ *               codes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [code]
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                     reward:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: 리딤 그룹 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       409:
+ *         description: 동일한 코드가 이미 존재
+ */
+router.post('/redeem/group', AdminController.createRedeemGroup);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group/{id}:
+ *   get:
+ *     summary: 리딤 그룹 상세 조회 (코드 전체 포함)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 리딤 그룹 상세 반환 성공
+ *       404:
+ *         description: 리딤 그룹을 찾을 수 없음
+ */
+router.get('/redeem/group/:id', AdminController.getRedeemGroupDetail);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group/{id}:
+ *   put:
+ *     summary: 리딤 그룹 수정 (gameId·codes 불변)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               periodText:
+ *                 type: string
+ *               startTime:
+ *                 type: string
+ *                 format: date-time
+ *               endTime:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: 리딤 그룹 수정 성공
+ *       404:
+ *         description: 리딤 그룹을 찾을 수 없음
+ */
+router.put('/redeem/group/:id', AdminController.updateRedeemGroup);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group/{id}:
+ *   delete:
+ *     summary: 리딤 그룹 삭제 (코드는 Cascade 자동 삭제)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 리딤 그룹 삭제 성공
+ *       404:
+ *         description: 리딤 그룹을 찾을 수 없음
+ */
+router.delete('/redeem/group/:id', AdminController.deleteRedeemGroup);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/group/{id}/code:
+ *   post:
+ *     summary: 리딤 코드 추가 (기존 그룹에)
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code]
+ *             properties:
+ *               code:
+ *                 type: string
+ *               reward:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 리딤 코드 추가 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       404:
+ *         description: 리딤 그룹을 찾을 수 없음
+ *       409:
+ *         description: 동일한 코드가 이미 존재
+ */
+router.post('/redeem/group/:id/code', AdminController.addRedeemCode);
+
+/**
+ * @swagger
+ * /api/v0/admin/redeem/code/{codeId}:
+ *   delete:
+ *     summary: 리딤 코드 삭제
+ *     tags: [Admin - Redeem]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: codeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 리딤 코드 삭제 성공
+ *       404:
+ *         description: 리딤 코드를 찾을 수 없음
+ */
+router.delete('/redeem/code/:codeId', AdminController.deleteRedeemCode);
+
 /**
  * @swagger
  * /api/v0/admin/event/list:

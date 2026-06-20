@@ -1597,6 +1597,386 @@ export class AdminController {
       });
     }
   }
+
+  /**
+   * 리딤(쿠폰) 그룹 목록 조회 (페이지네이션, 검색) — getItemList 미러링
+   * GET /api/v0/admin/redeem/group/list
+   */
+  async getRedeemGroupList(req: Request, res: Response): Promise<void> {
+    try {
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 10);
+      const gameId = req.query.gameId
+        ? parseInt(req.query.gameId as string)
+        : undefined;
+      const title = req.query.title as string;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (gameId) where.gameId = gameId;
+      if (title) where.title = { contains: title, mode: 'insensitive' };
+
+      const [total, groups] = await Promise.all([
+        prisma.redeemGroup.count({ where }),
+        prisma.redeemGroup.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { id: 'desc' }, // 최신순
+          include: {
+            game: { select: { id: true, name: true, slug: true } },
+            _count: { select: { codes: true } },
+          },
+        }),
+      ]);
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '성공',
+        data: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          groups,
+        },
+      });
+    } catch (error) {
+      logger.error('getRedeemGroupList Error:', error);
+      res.status(500).json({
+        resultCode: 500,
+        resultMsg: '서버 오류가 발생했습니다.',
+      });
+    }
+  }
+
+  /**
+   * 리딤 그룹 상세 조회 (코드 전체 포함) — getItemDetail 미러링
+   * GET /api/v0/admin/redeem/group/:id
+   */
+  async getRedeemGroupDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const group = await prisma.redeemGroup.findUnique({
+        where: { id },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          codes: { orderBy: { id: 'asc' } },
+        },
+      });
+
+      if (!group) {
+        res.status(404).json({ resultCode: 404, resultMsg: '리딤 그룹을 찾을 수 없습니다.' });
+        return;
+      }
+
+      sendOk(res, group);
+    } catch (error) {
+      logger.error('getRedeemGroupDetail Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 리딤 그룹 생성 (코드 동봉 시 nested create) — createItem 미러링
+   * POST /api/v0/admin/redeem/group
+   */
+  async createRedeemGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { gameId, title, periodText, startTime, endTime, codes } = req.body;
+
+      if (!gameId || !title) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(gameId, title)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const data: any = {
+        gameId: parseInt(String(gameId)),
+        title: String(title),
+        periodText: normStr(periodText),
+      };
+      // startTime/endTime은 받으면 new Date() 변환, 빈/누락이면 스키마 기본(now / null).
+      if (startTime !== undefined && startTime !== null && String(startTime).trim() !== '') {
+        data.startTime = new Date(startTime);
+      }
+      if (endTime !== undefined && endTime !== null && String(endTime).trim() !== '') {
+        data.endTime = new Date(endTime);
+      }
+      // codes 동봉 시 prisma nested create. code는 전역 @unique → 충돌 시 P2002.
+      if (Array.isArray(codes) && codes.length > 0) {
+        data.codes = {
+          create: codes.map((c: { code: string; reward?: string }) => ({
+            code: String(c.code),
+            reward: normStr(c.reward),
+          })),
+        };
+      }
+
+      const group = await prisma.redeemGroup.create({
+        data,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          codes: { orderBy: { id: 'asc' } },
+        },
+      });
+
+      logAdminActivity(
+        req,
+        'REDEEM_GROUP_CREATE',
+        'redeem',
+        group.id,
+        `리딤 그룹 '${group.title}' 생성(${group.game.slug})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '리딤 그룹이 생성되었습니다.',
+        data: group,
+      });
+    } catch (error) {
+      // code @unique 전역 위반
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일한 코드가 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('createRedeemGroup Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 리딤 그룹 수정 (gameId·codes 불변, !==undefined 필드만 머지) — updateItem 미러링
+   * PUT /api/v0/admin/redeem/group/:id
+   */
+  async updateRedeemGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.redeemGroup.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '리딤 그룹을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { title, periodText, startTime, endTime } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      // gameId·codes는 불변 — 별도 엔드포인트로만 변경.
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = String(title);
+      if (periodText !== undefined) updateData.periodText = normStr(periodText);
+      if (startTime !== undefined) updateData.startTime = new Date(startTime);
+      if (endTime !== undefined) updateData.endTime = endTime ? new Date(endTime) : null;
+
+      const group = await prisma.redeemGroup.update({
+        where: { id },
+        data: updateData,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+          codes: { orderBy: { id: 'asc' } },
+        },
+      });
+
+      logAdminActivity(
+        req,
+        'REDEEM_GROUP_UPDATE',
+        'redeem',
+        group.id,
+        `리딤 그룹 '${group.title}' 수정(${group.game.slug})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '리딤 그룹이 수정되었습니다.',
+        data: group,
+      });
+    } catch (error) {
+      logger.error('updateRedeemGroup Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 리딤 그룹 삭제 (코드는 onDelete:Cascade로 자동 삭제) — deleteItem 미러링
+   * DELETE /api/v0/admin/redeem/group/:id
+   */
+  async deleteRedeemGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.redeemGroup.findUnique({
+        where: { id },
+        include: { game: { select: { slug: true } } },
+      });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '리딤 그룹을 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.redeemGroup.delete({ where: { id } });
+
+      logAdminActivity(
+        req,
+        'REDEEM_GROUP_DELETE',
+        'redeem',
+        id,
+        `리딤 그룹 '${existing.title}' 삭제(${existing.game.slug})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '리딤 그룹이 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteRedeemGroup Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 리딤 코드 추가 (기존 그룹에) — code 전역 @unique 충돌 시 409
+   * POST /api/v0/admin/redeem/group/:id/code
+   */
+  async addRedeemCode(req: Request, res: Response): Promise<void> {
+    try {
+      const groupId = parseInt(String(req.params.id), 10);
+      if (!groupId) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const { code, reward } = req.body;
+      if (!code) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(code)을 입력해주세요.',
+        });
+        return;
+      }
+
+      const group = await prisma.redeemGroup.findUnique({
+        where: { id: groupId },
+        include: { game: { select: { slug: true } } },
+      });
+      if (!group) {
+        res.status(404).json({ resultCode: 404, resultMsg: '리딤 그룹을 찾을 수 없습니다.' });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const created = await prisma.redeemCode.create({
+        data: {
+          groupId,
+          code: String(code),
+          reward: normStr(reward),
+        },
+      });
+
+      logAdminActivity(
+        req,
+        'REDEEM_CODE_ADD',
+        'redeem',
+        created.id,
+        `리딤 코드 '${created.code}' 추가(${group.game.slug} / 그룹 '${group.title}')`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '리딤 코드가 추가되었습니다.',
+        data: created,
+      });
+    } catch (error) {
+      // code @unique 전역 위반
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일한 코드가 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('addRedeemCode Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 리딤 코드 삭제 — deleteItem 미러링
+   * DELETE /api/v0/admin/redeem/code/:codeId
+   */
+  async deleteRedeemCode(req: Request, res: Response): Promise<void> {
+    try {
+      const codeId = parseInt(String(req.params.codeId), 10);
+      if (!codeId) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.redeemCode.findUnique({
+        where: { id: codeId },
+        include: { group: { include: { game: { select: { slug: true } } } } },
+      });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '리딤 코드를 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.redeemCode.delete({ where: { id: codeId } });
+
+      logAdminActivity(
+        req,
+        'REDEEM_CODE_DELETE',
+        'redeem',
+        codeId,
+        `리딤 코드 '${existing.code}' 삭제(${existing.group.game.slug})`,
+      );
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '리딤 코드가 삭제되었습니다.',
+      });
+    } catch (error) {
+      logger.error('deleteRedeemCode Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
 }
 
 export default new AdminController();
