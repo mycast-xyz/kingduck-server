@@ -61,6 +61,103 @@ export class AdminController {
   }
 
   /**
+   * 게임 생성 (어드민 직접 등록)
+   * POST /api/v0/admin/game
+   */
+  async createGame(req: Request, res: Response): Promise<void> {
+    try {
+      const { slug, name, description } = req.body;
+
+      if (!slug || !name) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(slug, name)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const game = await prisma.game.create({
+        data: {
+          slug: String(slug).trim(),
+          name: String(name).trim(),
+          description: normStr(description),
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '게임이 생성되었습니다.',
+        data: game,
+      });
+    } catch (error) {
+      // slug @unique 위반
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 slug 게임이 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('createGame Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 게임 수정 (어드민) — slug 불변, name/description 부분 머지
+   * PUT /api/v0/admin/game/:slug
+   */
+  async updateGame(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = String(req.params.slug);
+
+      const existing = await prisma.game.findUnique({ where: { slug } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '게임을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const { name, description } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = String(name).trim();
+      if (description !== undefined) updateData.description = normStr(description);
+
+      const game = await prisma.game.update({ where: { slug }, data: updateData });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '게임이 수정되었습니다.',
+        data: game,
+      });
+    } catch (error) {
+      // slug @unique 위반(이론상 slug 불변이라 발생 어려우나 item과 동일 방어)
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 slug 게임이 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('updateGame Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
    * 게임 아이콘 업로드/교체
    * POST /api/v0/admin/game/:slug/icon  (multipart/form-data, field: file)
    * 업로드 이미지를 webp로 변환해 static/logo/{slug}.webp 에 덮어쓰고 icon_url 을 갱신한다.
@@ -338,6 +435,246 @@ export class AdminController {
         resultCode: 500,
         resultMsg: '서버 오류가 발생했습니다.',
       });
+    }
+  }
+
+  /**
+   * 캐릭터 생성 (어드민 직접 등록) — createItem 미러링
+   * POST /api/v0/admin/character
+   */
+  async createCharacter(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        gameId,
+        name,
+        rarity,
+        elementId,
+        pathId,
+        weaponType,
+        role,
+        originalId,
+        description,
+        imageUrl,
+        metadata,
+      } = req.body;
+
+      // Character 모델 NOT NULL/관계 필수 컬럼은 gameId, name 둘뿐(나머지 nullable).
+      if (!gameId || !name) {
+        res.status(400).json({
+          resultCode: 400,
+          resultMsg: '필수 항목(gameId, name)을 모두 입력해주세요.',
+        });
+        return;
+      }
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션) — originalId가 ''이면 unique 충돌 회피.
+      const normStr = (v: unknown): string | null => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+      const normInt = (v: unknown): number | null =>
+        v !== undefined && v !== null && v !== '' ? parseInt(String(v)) : null;
+
+      const character = await prisma.character.create({
+        data: {
+          gameId: parseInt(String(gameId)),
+          name: String(name),
+          rarity: normInt(rarity),
+          elementId: normInt(elementId),
+          pathId: normInt(pathId),
+          weaponType: normStr(weaponType),
+          role: normStr(role),
+          originalId: normStr(originalId),
+          description: normStr(description),
+          imageUrl: normStr(imageUrl),
+          metadata: metadata ?? undefined,
+        },
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '캐릭터가 생성되었습니다.',
+        data: character,
+      });
+    } catch (error) {
+      // @@unique([gameId, originalId]) 위반 (B-H4b)
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 gameId + originalId 캐릭터가 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('createCharacter Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 캐릭터 수정 (어드민) — updateItem 미러링, !==undefined 필드만 머지
+   * PUT /api/v0/admin/character/:id
+   */
+  async updateCharacter(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.character.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '캐릭터를 찾을 수 없습니다.' });
+        return;
+      }
+
+      const {
+        gameId,
+        name,
+        rarity,
+        elementId,
+        pathId,
+        weaponType,
+        role,
+        originalId,
+        description,
+        imageUrl,
+        metadata,
+      } = req.body;
+
+      // 빈 문자열은 null로 정규화(updateElement 컨벤션).
+      const normStr = (v: unknown): string | null => {
+        const s = String(v).trim();
+        return s.length > 0 ? s : null;
+      };
+      const normInt = (v: unknown): number | null =>
+        v === null || v === '' ? null : parseInt(String(v));
+
+      const updateData: any = {};
+      if (gameId !== undefined) updateData.gameId = parseInt(String(gameId));
+      if (name !== undefined) updateData.name = String(name);
+      if (rarity !== undefined) updateData.rarity = normInt(rarity);
+      if (elementId !== undefined) updateData.elementId = normInt(elementId);
+      if (pathId !== undefined) updateData.pathId = normInt(pathId);
+      if (weaponType !== undefined) updateData.weaponType = normStr(weaponType);
+      if (role !== undefined) updateData.role = normStr(role);
+      if (originalId !== undefined) updateData.originalId = normStr(originalId);
+      if (description !== undefined) updateData.description = normStr(description);
+      if (imageUrl !== undefined) updateData.imageUrl = normStr(imageUrl);
+      if (metadata !== undefined) updateData.metadata = metadata;
+
+      const character = await prisma.character.update({
+        where: { id },
+        data: updateData,
+        include: {
+          game: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '캐릭터가 수정되었습니다.',
+        data: character,
+      });
+    } catch (error) {
+      // @@unique([gameId, originalId]) 위반 (B-H4b)
+      if ((error as { code?: string }).code === 'P2002') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '동일 gameId + originalId 캐릭터가 이미 존재합니다.',
+        });
+        return;
+      }
+      logger.error('updateCharacter Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 캐릭터 삭제 (어드민) — deleteItem 미러링
+   * DELETE /api/v0/admin/character/:id
+   */
+  async deleteCharacter(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+
+      const existing = await prisma.character.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ resultCode: 404, resultMsg: '캐릭터를 찾을 수 없습니다.' });
+        return;
+      }
+
+      await prisma.character.delete({ where: { id } });
+
+      res.status(200).json({
+        resultCode: 200,
+        resultMsg: '캐릭터가 삭제되었습니다.',
+      });
+    } catch (error) {
+      // FK 제약(영상 등 이 캐릭터를 참조)으로 삭제 불가 (P2003)
+      if ((error as { code?: string }).code === 'P2003') {
+        res.status(409).json({
+          resultCode: 409,
+          resultMsg: '이 캐릭터를 참조하는 데이터가 있어 삭제할 수 없습니다.',
+        });
+        return;
+      }
+      logger.error('deleteCharacter Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 캐릭터 이미지 업로드/교체 — uploadItemImage와 동형(sharp→webp→static→imageUrl).
+   * POST /api/v0/admin/character/:id/image  (multipart/form-data, field: file)
+   */
+  async uploadCharacterImage(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } }).file;
+      if (!id) {
+        res.status(400).json({ resultCode: 400, resultMsg: '잘못된 id 입니다.' });
+        return;
+      }
+      if (!file) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일이 없습니다.' });
+        return;
+      }
+      if (!file.mimetype?.startsWith('image/')) {
+        res.status(400).json({ resultCode: 400, resultMsg: '이미지 파일만 업로드할 수 있습니다.' });
+        return;
+      }
+
+      const character = await prisma.character.findUnique({
+        where: { id },
+        include: { game: true },
+      });
+      if (!character) {
+        res.status(404).json({ resultCode: 404, resultMsg: '캐릭터를 찾을 수 없습니다.' });
+        return;
+      }
+
+      const slug = character.game.slug;
+      // static/image/{slug}/character/{id}.webp (express '/assets' → 'static'). id로 파일명 → 이름 특수문자 회피.
+      const dir = path.join(process.cwd(), 'static', 'image', slug, 'character');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await sharp(file.buffer).webp({ quality: 90 }).toFile(path.join(dir, `${id}.webp`));
+
+      const imageUrl = `assets/image/${slug}/character/${id}.webp?v=${Date.now()}`;
+      await prisma.character.update({ where: { id }, data: { imageUrl } });
+      logger.info(`Character image updated: ${slug}/${character.name} (#${id}) → ${imageUrl}`);
+      sendOk(res, { id, imageUrl });
+    } catch (error) {
+      logger.error('uploadCharacterImage Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '아이콘 업로드에 실패했습니다.' });
     }
   }
 

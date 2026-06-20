@@ -38,6 +38,70 @@ router.get('/game/list', AdminController.getGameList);
 
 /**
  * @swagger
+ * /api/v0/admin/game:
+ *   post:
+ *     summary: 게임 생성 (어드민 직접 등록)
+ *     tags: [Admin - Game CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slug, name]
+ *             properties:
+ *               slug:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 게임 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       409:
+ *         description: 동일 slug 게임이 이미 존재
+ */
+router.post('/game', AdminController.createGame);
+
+/**
+ * @swagger
+ * /api/v0/admin/game/{slug}:
+ *   put:
+ *     summary: 게임 수정 (어드민, slug 불변)
+ *     tags: [Admin - Game CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 게임 수정 성공
+ *       404:
+ *         description: 게임을 찾을 수 없음
+ */
+router.put('/game/:slug', AdminController.updateGame);
+
+/**
+ * @swagger
  * /api/v0/admin/game/{slug}/icon:
  *   post:
  *     summary: 게임 아이콘 업로드/교체
@@ -107,6 +171,134 @@ router.post(
  *         description: 캐릭터 목록 반환 성공
  */
 router.get('/character/list', AdminController.getCharacterList);
+
+/**
+ * @swagger
+ * /api/v0/admin/character:
+ *   post:
+ *     summary: 캐릭터 생성 (어드민 직접 등록)
+ *     tags: [Admin - Character CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gameId, name]
+ *             properties:
+ *               gameId:
+ *                 type: integer
+ *               name:
+ *                 type: string
+ *               rarity:
+ *                 type: integer
+ *               elementId:
+ *                 type: integer
+ *               pathId:
+ *                 type: integer
+ *               weaponType:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               originalId:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               imageUrl:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: 캐릭터 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       409:
+ *         description: 동일 gameId + originalId 캐릭터가 이미 존재
+ */
+router.post('/character', AdminController.createCharacter);
+
+/**
+ * @swagger
+ * /api/v0/admin/character/{id}:
+ *   put:
+ *     summary: 캐릭터 수정 (어드민)
+ *     tags: [Admin - Character CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: 캐릭터 수정 성공
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ *       409:
+ *         description: 동일 gameId + originalId 캐릭터가 이미 존재
+ */
+router.put('/character/:id', AdminController.updateCharacter);
+
+/**
+ * @swagger
+ * /api/v0/admin/character/{id}:
+ *   delete:
+ *     summary: 캐릭터 삭제 (어드민)
+ *     tags: [Admin - Character CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 캐릭터 삭제 성공
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ *       409:
+ *         description: 참조 데이터가 있어 삭제 불가
+ */
+router.delete('/character/:id', AdminController.deleteCharacter);
+
+/**
+ * @swagger
+ * /api/v0/admin/character/{id}/image:
+ *   post:
+ *     summary: 캐릭터 이미지 업로드/교체
+ *     tags: [Admin - Character CRUD]
+ *     security:
+ *       - bearerAuth: []
+ *     consumes: [multipart/form-data]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 업로드 성공(갱신된 imageUrl 반환)
+ *       404:
+ *         description: 캐릭터를 찾을 수 없음
+ */
+router.post(
+  '/character/:id/image',
+  iconUpload.single('file'),
+  AdminController.uploadCharacterImage,
+);
 
 // 데이터 공백(재크롤 필요) 집계 — metadata.dataGaps 기반
 router.get('/data-gaps', AdminController.getDataGaps);
