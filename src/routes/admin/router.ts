@@ -18,6 +18,45 @@ const iconUpload = multer({
 // recheckDb: 어드민은 민감 작업이라 매 요청 DB에서 role/밴 상태를 재확인(강등/밴 즉시 반영, B-S6).
 router.use(authorize(['ADMIN', 'MANAGER'], { recheckDb: true }));
 
+// 대시보드 / 감사 로그
+
+/**
+ * @swagger
+ * /api/v0/admin/dashboard/summary:
+ *   get:
+ *     summary: 대시보드 요약 통계 (게임/캐릭터/아이템/이벤트/유저/대기 이벤트 수)
+ *     tags: [Admin - Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 요약 통계 반환 성공
+ */
+router.get('/dashboard/summary', AdminController.getDashboardSummary);
+
+/**
+ * @swagger
+ * /api/v0/admin/audit-log:
+ *   get:
+ *     summary: 전역 활동(감사) 로그 조회
+ *     tags: [Admin - Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 활동 로그 반환 성공
+ */
+router.get('/audit-log', AdminController.getAuditLog);
+
 /**
  * @swagger
  * /api/v0/admin/game/list:

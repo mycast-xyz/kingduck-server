@@ -3,11 +3,66 @@ import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
 import { sendOk } from '../../utils/responseBuilder';
 import { clampPage, clampLimit } from '../../utils/pagination';
+import UserActivityService from '../../services/UserActivityService';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 
+// 어드민 변경 작업 감사 로그 — 비차단(실패해도 메인 응답에 영향 없음, logActivity 내부 try/catch).
+// userId는 JWT(req.user)에서. details는 { entity, entityId, summary } 계약.
+function logAdminActivity(
+  req: Request,
+  action: string,
+  entity: string,
+  entityId: number,
+  summary: string,
+): void {
+  const userId = req.user?.userId;
+  if (!userId) return;
+  void UserActivityService.logActivity(userId, action, { entity, entityId, summary });
+}
+
 export class AdminController {
+  /**
+   * 대시보드 요약 통계 조회
+   * GET /api/v0/admin/dashboard/summary
+   */
+  async getDashboardSummary(_req: Request, res: Response): Promise<void> {
+    try {
+      const [games, characters, items, events, users, pendingEvents] =
+        await Promise.all([
+          prisma.game.count(),
+          prisma.character.count(),
+          prisma.item.count(),
+          prisma.calendarEvent.count(),
+          prisma.user.count(),
+          prisma.calendarEvent.count({ where: { status: 'PENDING' } }),
+        ]);
+
+      sendOk(res, { games, characters, items, events, users, pendingEvents });
+    } catch (error) {
+      logger.error('getDashboardSummary Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
+
+  /**
+   * 전역 활동(감사) 로그 조회 — UserActivityService.getLogs를 sendOk 봉투로 래핑.
+   * GET /api/v0/admin/audit-log?page&limit
+   */
+  async getAuditLog(req: Request, res: Response): Promise<void> {
+    try {
+      const page = clampPage(parseInt(req.query.page as string) || 1);
+      const limit = clampLimit(parseInt(req.query.limit as string) || 20);
+
+      // userId 생략 = 전역 조회. getLogs는 { logs, pagination } raw 반환 → 봉투로 감싼다.
+      const result = await UserActivityService.getLogs(undefined, page, limit);
+      sendOk(res, result);
+    } catch (error) {
+      logger.error('getAuditLog Error:', error);
+      res.status(500).json({ resultCode: 500, resultMsg: '서버 오류가 발생했습니다.' });
+    }
+  }
   /**
    * 게임 목록 및 통계 조회
    * GET /api/v0/admin/game/list
@@ -495,6 +550,14 @@ export class AdminController {
         },
       });
 
+      logAdminActivity(
+        req,
+        'CHARACTER_CREATE',
+        'character',
+        character.id,
+        `캐릭터 '${character.name}' 생성(${character.game.slug})`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '캐릭터가 생성되었습니다.',
@@ -575,6 +638,14 @@ export class AdminController {
         },
       });
 
+      logAdminActivity(
+        req,
+        'CHARACTER_UPDATE',
+        'character',
+        character.id,
+        `캐릭터 '${character.name}' 수정(${character.game.slug})`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '캐릭터가 수정되었습니다.',
@@ -606,13 +677,24 @@ export class AdminController {
         return;
       }
 
-      const existing = await prisma.character.findUnique({ where: { id } });
+      const existing = await prisma.character.findUnique({
+        where: { id },
+        include: { game: { select: { slug: true } } },
+      });
       if (!existing) {
         res.status(404).json({ resultCode: 404, resultMsg: '캐릭터를 찾을 수 없습니다.' });
         return;
       }
 
       await prisma.character.delete({ where: { id } });
+
+      logAdminActivity(
+        req,
+        'CHARACTER_DELETE',
+        'character',
+        id,
+        `캐릭터 '${existing.name}' 삭제(${existing.game.slug})`,
+      );
 
       res.status(200).json({
         resultCode: 200,
@@ -872,6 +954,14 @@ export class AdminController {
         },
       });
 
+      logAdminActivity(
+        req,
+        'ITEM_CREATE',
+        'item',
+        item.id,
+        `아이템 '${item.name}' 생성(${item.game.slug})`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '아이템이 생성되었습니다.',
@@ -937,6 +1027,14 @@ export class AdminController {
         },
       });
 
+      logAdminActivity(
+        req,
+        'ITEM_UPDATE',
+        'item',
+        item.id,
+        `아이템 '${item.name}' 수정(${item.game.slug})`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '아이템이 수정되었습니다.',
@@ -968,13 +1066,24 @@ export class AdminController {
         return;
       }
 
-      const existing = await prisma.item.findUnique({ where: { id } });
+      const existing = await prisma.item.findUnique({
+        where: { id },
+        include: { game: { select: { slug: true } } },
+      });
       if (!existing) {
         res.status(404).json({ resultCode: 404, resultMsg: '아이템을 찾을 수 없습니다.' });
         return;
       }
 
       await prisma.item.delete({ where: { id } });
+
+      logAdminActivity(
+        req,
+        'ITEM_DELETE',
+        'item',
+        id,
+        `아이템 '${existing.name}' 삭제(${existing.game.slug})`,
+      );
 
       res.status(200).json({
         resultCode: 200,
@@ -1198,6 +1307,14 @@ export class AdminController {
         where: { id: eventId },
       });
 
+      logAdminActivity(
+        req,
+        'EVENT_APPROVE',
+        'event',
+        eventId,
+        `이벤트 '${updatedEvent?.title ?? eventId}' 승인`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '이벤트가 승인되었습니다.',
@@ -1248,6 +1365,14 @@ export class AdminController {
           game: { select: { id: true, name: true, slug: true } },
         },
       });
+
+      logAdminActivity(
+        req,
+        'EVENT_CREATE',
+        'event',
+        event.id,
+        `이벤트 '${event.title}' 생성(${event.game.slug})`,
+      );
 
       res.status(200).json({
         resultCode: 200,
@@ -1318,6 +1443,14 @@ export class AdminController {
         },
       });
 
+      logAdminActivity(
+        req,
+        'EVENT_UPDATE',
+        'event',
+        updatedEvent.id,
+        `이벤트 '${updatedEvent.title}' 수정(${updatedEvent.game.slug})`,
+      );
+
       res.status(200).json({
         resultCode: 200,
         resultMsg: '이벤트가 수정되었습니다.',
@@ -1350,6 +1483,7 @@ export class AdminController {
 
       const existing = await prisma.calendarEvent.findUnique({
         where: { id: eventId },
+        include: { game: { select: { slug: true } } },
       });
 
       if (!existing) {
@@ -1363,6 +1497,14 @@ export class AdminController {
       await prisma.calendarEvent.delete({
         where: { id: eventId },
       });
+
+      logAdminActivity(
+        req,
+        'EVENT_DELETE',
+        'event',
+        eventId,
+        `이벤트 '${existing.title}' 삭제(${existing.game.slug})`,
+      );
 
       res.status(200).json({
         resultCode: 200,
@@ -1433,6 +1575,14 @@ export class AdminController {
       const updatedEvent = await prisma.calendarEvent.findUnique({
         where: { id: eventId },
       });
+
+      logAdminActivity(
+        req,
+        'EVENT_REJECT',
+        'event',
+        eventId,
+        `이벤트 '${updatedEvent?.title ?? eventId}' 거부${reason ? `(사유: ${reason})` : ''}`,
+      );
 
       res.status(200).json({
         resultCode: 200,
