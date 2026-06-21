@@ -45,8 +45,15 @@ const DETAIL_QUERY = `query($id: String!) {
     profile_detail { name desc }
     fashion { fashionId name desc quality icon displayIcon portraitImg headIconBig isDefault }
     voices { daily { name desc } battle { name desc } }
+    breakthrough { level items_id amount }
+    preferrable_gifts { item_id amount }
   }
 }`;
+
+// 재료/선물 이름·아이콘 해석용 전체 아이템 룩업.
+const ITEMS_QUERY = `query { items(filter: {}) { id name icon } }`;
+// item()으로 안 잡히는 특수 통화 id → 한글 라벨.
+const SPECIAL_ITEMS: Record<string, string> = { gold: '골드', Gold: '골드' };
 
 interface EsperListItem {
   id: string;
@@ -58,8 +65,60 @@ interface EsperListItem {
 }
 
 export class NteCharacterScraper extends ScraperBase {
+  // 아이템 id → { name, icon }. scrape() 시작 시 1회 적재.
+  private itemMap = new Map<string, { name: string; icon: string | null }>();
+  // 아이템 아이콘 다운로드 캐시(같은 자산 중복 다운로드 방지).
+  private itemIconCache = new Map<string, string>();
+
   constructor() {
     super(GAME);
+  }
+
+  /** 아이템 아이콘(/Game/UI/...) 다운로드(캐시). 실패/없으면 ''. */
+  private async itemIcon(icon: string | null | undefined): Promise<string> {
+    if (!icon) return '';
+    const cached = this.itemIconCache.get(icon);
+    if (cached !== undefined) return cached;
+    let path = '';
+    const base = this.baseName(icon);
+    const url = this.assetUrl(icon);
+    if (base && url) {
+      path = (await ImageDownloader.downloadAndSave(url, GAME, 'item', base)) || '';
+    }
+    this.itemIconCache.set(icon, path);
+    return path;
+  }
+
+  /** 아이템 id + 수량 → { name, icon, amount }. 룩업 실패 시 특수 통화 라벨 → id 폴백. */
+  private async resolveMaterial(id: string, amount: number): Promise<any> {
+    const it = this.itemMap.get(id);
+    const name = it?.name || SPECIAL_ITEMS[id] || id;
+    const icon = it ? await this.itemIcon(it.icon) : '';
+    return { name, icon, amount };
+  }
+
+  /** 돌파(breakthrough) → [{ level, materials: [{name,icon,amount}] }] (레벨별). */
+  private async buildBreakthrough(entries: any[]): Promise<any[]> {
+    const out: any[] = [];
+    for (const e of entries || []) {
+      const ids = e.items_id || [];
+      const amts = e.amount || [];
+      const materials: any[] = [];
+      for (let i = 0; i < ids.length; i++) {
+        materials.push(await this.resolveMaterial(String(ids[i]), amts[i]));
+      }
+      out.push({ level: e.level, materials });
+    }
+    return out;
+  }
+
+  /** 선호 선물(preferrable_gifts) → [{name,icon,amount}] (평면). */
+  private async buildGifts(gifts: any[]): Promise<any[]> {
+    const out: any[] = [];
+    for (const g of gifts || []) {
+      out.push(await this.resolveMaterial(String(g.item_id), g.amount));
+    }
+    return out;
   }
 
   /** everness GraphQL에 한국어 헤더로 POST. */
@@ -202,6 +261,17 @@ export class NteCharacterScraper extends ScraperBase {
 
     await this.ensureGame();
 
+    // 재료/선물 이름·아이콘 해석용 아이템 룩업 1회 적재(실패해도 캐릭터 크롤은 진행).
+    try {
+      const itemsRes = await this.gql<{ items: any[] }>(ITEMS_QUERY);
+      for (const it of itemsRes?.items || []) {
+        this.itemMap.set(it.id, { name: it.name, icon: it.icon });
+      }
+      logger.info(`NTE item lookup loaded: ${this.itemMap.size} items.`);
+    } catch (err) {
+      logger.warn('NTE item lookup failed (돌파/선물 이름 미해석로 진행):', err);
+    }
+
     const list = await this.gql<{ espers: EsperListItem[] }>(LIST_QUERY);
     let espers = list?.espers || [];
     logger.info(`Found ${espers.length} NTE espers.`);
@@ -319,6 +389,8 @@ export class NteCharacterScraper extends ScraperBase {
             stats: this.mapStats(d.stats), // StatsView
             costumes: await this.buildCostumes(d.fashion || []), // CostumeView
             voiceLines: this.buildVoices(d.voices), // VoiceView
+            breakthrough: await this.buildBreakthrough(d.breakthrough || []), // NteMaterialView
+            gifts: await this.buildGifts(d.preferrable_gifts || []), // NteMaterialView
           },
         });
         logger.info(
