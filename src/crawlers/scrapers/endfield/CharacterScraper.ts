@@ -20,6 +20,27 @@ export class EndfieldCharacterScraper extends ScraperBase {
     super('endfield');
   }
 
+  /** 선호 선물(bestGifts) 해석 → NteMaterialView가 읽는 [{name, icon, amount}].
+   *  name=i18nMap[nameI18nId], icon=endfieldtools itemicon 다운로드, amount=favorablePoint. */
+  private async resolveBestGifts(
+    gifts: any,
+    i18nMap: Record<string, string>,
+  ): Promise<any[]> {
+    if (!Array.isArray(gifts)) return [];
+    const out: any[] = [];
+    for (const g of gifts) {
+      const name = (g?.nameI18nId && i18nMap[g.nameI18nId]) || g?.itemId || '';
+      let icon = '';
+      if (g?.iconId) {
+        const url = `https://endfieldtools.dev/assets/images/endfield/itemicon/${g.iconId}.png`;
+        icon =
+          (await ImageDownloader.downloadAndSave(url, 'endfield', 'item', g.iconId)) || '';
+      }
+      out.push({ name, icon, amount: g?.favorablePoint });
+    }
+    return out;
+  }
+
   async scrape(options?: { limit?: number }): Promise<any[]> {
     logger.info('Starting Endfield Character scraping...');
 
@@ -281,6 +302,12 @@ export class EndfieldCharacterScraper extends ScraperBase {
             `splash_${charId}`,
           );
 
+          // 선호 선물 해석(i18n 이름 + 아이콘) — 원본 bestGifts(i18n ID 미해석)를 덮어쓴다.
+          const bestGifts = await this.resolveBestGifts(
+            resolvedDetail.bestGifts,
+            i18nMap,
+          );
+
           // Map Data
           const mappedItem = {
             gameId: game.id,
@@ -292,6 +319,7 @@ export class EndfieldCharacterScraper extends ScraperBase {
             imageUrl: localIconUrl, // Use local path
             metadata: {
               ...resolvedDetail,
+              bestGifts, // 해석본으로 교체 ([{name,icon,amount}])
               cardImageUrl: localSplashUrl, // Use local path
               originalIconUrl: remoteIconUrl,
               originalSplashUrl: remoteSplashUrl,
