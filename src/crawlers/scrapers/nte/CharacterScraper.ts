@@ -36,12 +36,14 @@ const LIST_QUERY = `query {
 const DETAIL_QUERY = `query($id: String!) {
   esper(id: $id) {
     id name element rarity element_id element_name weapon_type_id
-    icon iconBig iconGacha faction birthday description abilityName
+    icon iconBig iconGacha faction birthday description introduction abilityName
     arcs_tags { name icon type_id }
     stats { id_stats name values icon }
     abilities { name type_name icon phases { title description shortDescription } additional_desc { name desc } }
     awaken { name desc icon type_name }
     resonance { name desc icon type_name }
+    profile_detail { name desc }
+    fashion { fashionId name desc quality icon displayIcon portraitImg headIconBig isDefault }
   }
 }`;
 
@@ -138,6 +140,39 @@ export class NteCharacterScraper extends ScraperBase {
       });
     }
     return skills;
+  }
+
+  /** 기초 스탯 → StatsView(배열 fallback)가 읽는 { name, value, icon }. values는 레벨 배열이라 최대치 사용. */
+  private mapStats(stats: any[]): any[] {
+    return (stats || [])
+      .filter((s) => s?.name)
+      .map((s) => {
+        const v = Array.isArray(s.values) && s.values.length ? s.values[s.values.length - 1] : s.values;
+        return { key: s.id_stats || s.name, name: s.name, value: v ?? null, icon: '' };
+      });
+  }
+
+  /** 패션(코스튬) → CostumeView가 읽는 { name, desc, image }. 대표 일러스트(portraitImg) 다운로드. */
+  private async buildCostumes(fashion: any[]): Promise<any[]> {
+    const out: any[] = [];
+    for (const f of fashion || []) {
+      if (!f?.name) continue;
+      let image = '';
+      const src = f.portraitImg || f.displayIcon || f.headIconBig || f.icon;
+      const base = this.baseName(src);
+      const url = this.assetUrl(src);
+      if (base && url) {
+        image = (await ImageDownloader.downloadAndSave(url, GAME, 'costume', base)) || '';
+      }
+      out.push({
+        name: f.name,
+        desc: this.stripTags(f.desc),
+        image,
+        quality: f.quality || null,
+        isDefault: !!f.isDefault,
+      });
+    }
+    return out;
   }
 
   /** Game 행이 없으면 생성(서버에서 nte 크롤만 돌려도 Game 행이 생기도록 — wuwa 패턴). */
@@ -263,9 +298,15 @@ export class NteCharacterScraper extends ScraperBase {
             description: d.description || null,
             cardImageUrl: imageUrl,
             avatarImageUrl: avatarUrl,
+            introduction: d.introduction || null,
+            profileDetail: (d.profile_detail || [])
+              .filter((p: any) => p?.name || p?.desc)
+              .map((p: any) => ({ name: p.name || '', desc: this.stripTags(p.desc) })),
             skills, // SkillTreeView(NteSkillTreeViewModel)
             awaken: mapAwaken(d.awaken),
             resonance: mapAwaken(d.resonance),
+            stats: this.mapStats(d.stats), // StatsView
+            costumes: await this.buildCostumes(d.fashion || []), // CostumeView
           },
         });
         logger.info(
