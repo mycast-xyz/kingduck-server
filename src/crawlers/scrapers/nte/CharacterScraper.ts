@@ -44,6 +44,7 @@ const DETAIL_QUERY = `query($id: String!) {
     resonance { name desc icon type_name }
     profile_detail { name desc }
     fashion { fashionId name desc quality icon displayIcon portraitImg headIconBig isDefault }
+    voices { daily { name desc } battle { name desc } }
   }
 }`;
 
@@ -173,6 +174,16 @@ export class NteCharacterScraper extends ScraperBase {
       });
     }
     return out;
+  }
+
+  /** 음성(voices.daily + battle) → VoiceView가 읽는 { id, title, text }. 텍스트 전용.
+   *  (everness 오디오 자산은 공개 mp3 URL로 노출되지 않아 재생은 미지원 — 대사 텍스트만 표시.) */
+  private buildVoices(voices: any): any[] {
+    if (!voices) return [];
+    const groups = [...(voices.daily || []), ...(voices.battle || [])];
+    return groups
+      .filter((v) => v?.desc || v?.name)
+      .map((v, i) => ({ id: i, title: v.name || '', text: this.stripTags(v.desc) }));
   }
 
   /** Game 행이 없으면 생성(서버에서 nte 크롤만 돌려도 Game 행이 생기도록 — wuwa 패턴). */
@@ -307,6 +318,7 @@ export class NteCharacterScraper extends ScraperBase {
             resonance: mapAwaken(d.resonance),
             stats: this.mapStats(d.stats), // StatsView
             costumes: await this.buildCostumes(d.fashion || []), // CostumeView
+            voiceLines: this.buildVoices(d.voices), // VoiceView
           },
         });
         logger.info(
